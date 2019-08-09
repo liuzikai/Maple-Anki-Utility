@@ -44,7 +44,7 @@ class AnkiImporter:
         self.f = open(output_file, "w", encoding="utf-8")
 
     def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint):
-        self.f.write(";".join([
+        self.f.write("\t".join([
             subject,
             pronunciation,
             paraphrase,

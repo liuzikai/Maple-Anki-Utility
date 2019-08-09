@@ -7,13 +7,13 @@ from datetime import datetime
 import webbrowser
 
 # db_file = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
-db_file = "/Volumes/Kindle/system/vocabulary/vocab.db"
-output_path = "/Users/liuzikai/Desktop"
+db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
+output_path_ = "/Users/liuzikai/Desktop"
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
 
-    def __init__(self, db_file, output_file, new_only=True, parent=None):
+    def __init__(self, db_file, output_path, new_only=True, parent=None):
 
         # Setup UI
 
@@ -32,11 +32,15 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.example.textChanged.connect(self.example_changed)
         self.hint.textChanged.connect(self.hint_changed)
         self.saveAllButton.clicked.connect(self.save_all_clicked)
+        self.next_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
+        self.next_shortcut.activated.connect(self.next_click)
+        self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
+        self.discard_shortcut.activated.connect(self.discard_click)
 
         # Setup data
 
         self.db = KindleDB(db_file)
-        self.output_file = output_file
+        self.output_path = output_path
         self.importer = AnkiImporter()
 
         self.entries = self.db.fetch_all(new_only)
@@ -46,20 +50,24 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.entryList.clear()
         for (word_id, word, usage, title, authors, category) in self.entries:
+            # (status, subject, pronunciation, paraphrase, extension, usage, source, hint)
             self.records.append([
                 -0xFF,  # undefined value, for set_record_status() to work properly
                 word,
                 "Unknown",
                 "",
                 "",
-                '%s<br><div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (usage, title, authors),
+                usage,  # plain text, bold will be applied at load_entry()
+                '<div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (title, authors),  # read-only
                 ""
             ])
 
             self.entryList.addItem(word)
             self.set_record_status(self.entryList.count() - 1, 0)
 
-        # Setup initial entry
+        self.saving = False
+
+        # Setup initial entry, must be after necessary initialization
 
         self.entryList.setCurrentRow(0)
         self.load_entry(self.cur_idx())
@@ -115,24 +123,23 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.progressBar.setValue(self.confirmed_count + self.discard_count)
 
     def load_entry(self, idx):
-        (status, subject, pronunciation, paraphrase, extension, example, hint) = self.records[idx]
+        (status, subject, pronunciation, paraphrase, extension, usage, source, hint) = self.records[idx]
 
-        self.subject.document().setPlainText(subject)
+        self.subject.document().setPlainText(subject)  # subject change will lead to opening of dictionary
 
         if pronunciation == "Samantha":
             self.pronSamantha.toggle()
         elif pronunciation == "Daniel":
             self.pronDaniel.toggle()
         else:
-            self.pronSamantha.click()  # including toggling and first-time pronouncing
+            if not self.saving:
+                self.pronSamantha.click()  # including toggling and first-time pronouncing
 
         self.paraphrase.document().setPlainText(paraphrase)
         self.extension.document().setPlainText(extension)
-        self.example.document().setHtml(example)
+        self.example.document().setHtml(usage.replace(subject, u"<b>%s</b>" % subject))  # bold won't be saved as html
+        self.source.document().setHtml(source)  # read-only
         self.hint.document().setPlainText(hint)
-
-        webbrowser.open("dict://%s" % subject, autoraise=False)
-        self.raise_()
 
     def move_to_next(self):
         if self.cur_idx() < len(self.entries) - 1:
@@ -157,8 +164,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.records[self.cur_idx()][2] = sender.text()
 
     def subject_changed(self):
-        self.records[self.cur_idx()][1] = self.subject.toPlainText()
-        self.entryList.item(self.cur_idx()).setText(self.subject.toPlainText())
+        subject = self.subject.toPlainText()
+        self.records[self.cur_idx()][1] = subject
+        self.entryList.item(self.cur_idx()).setText(subject)
+        if not self.saving:
+            webbrowser.open("dict://%s" % subject, autoraise=False)
+            self.raise_()
 
     def paraphrase_changed(self):
         self.records[self.cur_idx()][3] = self.paraphrase.toPlainText()
@@ -167,24 +178,32 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.records[self.cur_idx()][4] = self.extension.toPlainText()
 
     def example_changed(self):
-        self.records[self.cur_idx()][5] = self.example.toHtml()
+        self.records[self.cur_idx()][5] = self.example.toPlainText()  # bold won't be saved as html
 
     def hint_changed(self):
-        self.records[self.cur_idx()][6] = self.hint.toPlainText()
+        self.records[self.cur_idx()][7] = self.hint.toPlainText()
 
     def save_all_clicked(self):
 
-        confirm_str = "%d confirmed, %d discarded, %d unread\n\n" \
-                      "Only confirmed ones will be saved. Continue to save entries?" % (
+        confirm_str = "%d confirmed, %d discarded, %d unread.\n\n" \
+                      "Only confirmed ones will be saved. " \
+                      "Confirmed and discarded ones will be marked as mutual on Kindle. " \
+                      "Please make sure kindle is connected. \n\n" \
+                      "Continue to save?" % (
                           self.confirmed_count, self.discard_count,
                           len(self.records) - self.confirmed_count - self.discard_count)
         ret = QtWidgets.QMessageBox.question(self, "Confirm", confirm_str, QtWidgets.QMessageBox.Yes,
                                              QtWidgets.QMessageBox.Cancel)
 
         if ret == QtWidgets.QMessageBox.Yes:
-            self.save_all()
-            QtWidgets.QMessageBox.information(self, "Success", "Saved %d entries" % self.confirmed_count,
-                                              QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel)
+            save_file = self.save_all()
+            QtWidgets.QMessageBox.information(self, "Success",
+                                              "Saved %d entries. Discard %d entries. %d entries unchanged.\n\n" \
+                                              "Saved to %s" % (
+                                                  self.confirmed_count, self.discard_count,
+                                                  len(self.records) - self.confirmed_count - self.discard_count,
+                                                  save_file),
+                                              QtWidgets.QMessageBox.Ok)
 
     def set_gui_enabled(self, value):
         self.nextButton.setEnabled(value)
@@ -196,17 +215,20 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.paraphrase.setEnabled(value)
         self.extension.setEnabled(value)
         self.example.setEnabled(value)
+        self.source.setEnabled(value)
         self.hint.setEnabled(value)
 
     def save_all(self):
 
         self.set_gui_enabled(False)
         self.progressBar.setMaximum(len(self.records))
+        self.saving = True
 
-        self.importer.open_file(self.output_file)
+        save_file = "%s/kindle-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+        self.importer.open_file(save_file)
         for i in range(len(self.records)):
 
-            (status, subject, pronunciation, paraphrase, extension, example, hint) = self.records[i]
+            (status, subject, pronunciation, paraphrase, extension, usage, source, hint) = self.records[i]
 
             # Set UI
             self.progressBar.setValue(i)
@@ -215,8 +237,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
             # Generate data
             if status == 1:  # confirmed
+                example = '%s<br>%s' % (usage, source)
                 mp3 = self.importer.generate_media(subject, pronunciation)
-                self.importer.write_entry(subject, "[sound:%s]" % mp3, paraphrase, extension, example, hint)
+                self.importer.write_entry(subject.replace("\n", "<br>"), "[sound:%s]" % mp3, paraphrase, extension, example, hint)
 
             # Write back to DB
             if status != 0:
@@ -226,10 +249,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.set_gui_enabled(True)
         self.progressBar.setValue(len(self.records))
+        self.saving = False
+
+        return save_file
 
     def closeEvent(self, event):
 
-        quit_msg = "Are you sure you want to exit the program?"
+        quit_msg = "Are you sure you want to exit the program? Unsaved edit will be lost."
         reply = QtWidgets.QMessageBox.question(self, 'Message',
                                                quit_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
 
@@ -239,19 +265,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             event.ignore()
 
 
-class ProcessThread(QtCore.QThread):
-
-    def __init__(self, window):
-        self.window = window
-
-
 if __name__ == '__main__':
 
     app = QApplication(sys.argv)
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + '1024.png'))
 
-    if os.path.isfile(db_file):
-        mapleUtility = MapleUtility(db_file,
-                                    "%s/kindle-%s.txt" % (output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S')))
+    if os.path.isfile(db_file_):
+        mapleUtility = MapleUtility(db_file_, output_path_)
         mapleUtility.show()
     else:
         msg_box = QtWidgets.QMessageBox()

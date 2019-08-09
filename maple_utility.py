@@ -11,9 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MapleUtility(object):
     def setupUi(self, MapleUtility):
         MapleUtility.setObjectName("MapleUtility")
-        MapleUtility.resize(716, 624)
+        MapleUtility.resize(716, 651)
         self.mainWidget = QtWidgets.QWidget(MapleUtility)
-        self.mainWidget.setGeometry(QtCore.QRect(4, 2, 711, 621))
+        self.mainWidget.setGeometry(QtCore.QRect(4, 2, 711, 651))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -46,6 +46,9 @@ class Ui_MapleUtility(object):
         self.entryList.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.entryList.setObjectName("entryList")
         self.verticalLayout.addWidget(self.entryList)
+        self.label_7 = QtWidgets.QLabel(self.widget_2)
+        self.label_7.setObjectName("label_7")
+        self.verticalLayout.addWidget(self.label_7)
         self.horizontalLayout_3.addWidget(self.widget_2)
         self.editWidget = QtWidgets.QWidget(self.mainWidget)
         self.editWidget.setObjectName("editWidget")
@@ -102,11 +105,19 @@ class Ui_MapleUtility(object):
         self.label_5.setObjectName("label_5")
         self.verticalLayout_3.addWidget(self.label_5)
         self.example = QtWidgets.QTextEdit(self.editWidget)
+        self.example.setMinimumSize(QtCore.QSize(0, 0))
         font = QtGui.QFont()
-        font.setPointSize(18)
+        font.setPointSize(14)
         self.example.setFont(font)
         self.example.setObjectName("example")
         self.verticalLayout_3.addWidget(self.example)
+        self.source = QtWidgets.QTextEdit(self.editWidget)
+        self.source.setMinimumSize(QtCore.QSize(0, 22))
+        self.source.setMaximumSize(QtCore.QSize(16777215, 22))
+        self.source.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.source.setReadOnly(True)
+        self.source.setObjectName("source")
+        self.verticalLayout_3.addWidget(self.source)
         self.label_6 = QtWidgets.QLabel(self.editWidget)
         self.label_6.setObjectName("label_6")
         self.verticalLayout_3.addWidget(self.label_6)
@@ -142,7 +153,8 @@ class Ui_MapleUtility(object):
 
     def retranslateUi(self, MapleUtility):
         _translate = QtCore.QCoreApplication.translate
-        MapleUtility.setWindowTitle(_translate("MapleUtility", "Import"))
+        MapleUtility.setWindowTitle(_translate("MapleUtility", "Maple Utility"))
+        self.label_7.setText(_translate("MapleUtility", "<html><head/><body><p align=\"center\"><span style=\" font-size:12pt; font-weight:600;\">Stay Hungry</span></p><p align=\"center\"><span style=\" font-size:12pt; font-weight:600;\">Stay Foolish</span></p></body></html>"))
         self.label.setText(_translate("MapleUtility", "Subject"))
         self.subject.setPlainText(_translate("MapleUtility", "Subject"))
         self.label_2.setText(_translate("MapleUtility", "Pronunciation"))
@@ -161,8 +173,13 @@ class Ui_MapleUtility(object):
         self.example.setHtml(_translate("MapleUtility", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:18pt; font-weight:400; font-style:normal;\">\n"
+"</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:14pt; font-weight:400; font-style:normal;\">\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Example</p></body></html>"))
+        self.source.setHtml(_translate("MapleUtility", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+"p, li { white-space: pre-wrap; }\n"
+"</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:13pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:12pt;\">Source</span></p></body></html>"))
         self.label_6.setText(_translate("MapleUtility", "Hint"))
         self.hint.setPlainText(_translate("MapleUtility", "Hint"))
         self.saveAllButton.setText(_translate("MapleUtility", "Save All"))
