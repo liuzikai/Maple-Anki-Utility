@@ -86,8 +86,18 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.has_changed = False
 
         # Setup initial entry, must be after necessary initialization
-        self.entryList.setCurrentRow(0)
-        self.load_entry(self.cur_idx())
+        if len(self.records) > 0:
+            self.entryList.setCurrentRow(0)
+            self.load_entry(self.cur_idx())
+            self.set_gui_enabled(True)
+        else:
+            self.subject.document().setPlainText("Congratulation!")  # subject change will lead to opening of dictionary
+            self.paraphrase.document().setPlainText("There is nothing to be processed.")
+            self.extension.document().setPlainText("Great work!")
+            self.example.document().setPlainText("")
+            self.source.document().setPlainText("")
+            self.hint.document().setPlainText("")
+            self.set_gui_enabled(False)
         self.update_progress_bar()
 
     def confirm_before_action(self, action_name):
@@ -198,12 +208,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.load_entry(self.cur_idx())
 
     def pron_clicked(self):
+        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
+            return
         sender = self.sender()
         if sender:
             AnkiImporter.pronounce(self.records[self.cur_idx()][1], sender.text())
             self.records[self.cur_idx()][2] = sender.text()
 
     def subject_changed(self):
+        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
+            return
         subject = self.subject.toPlainText()
         self.records[self.cur_idx()][1] = subject
         self.entryList.item(self.cur_idx()).setText(subject)
@@ -212,15 +226,23 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.raise_()
 
     def paraphrase_changed(self):
+        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
+            return
         self.records[self.cur_idx()][3] = self.paraphrase.toPlainText()
 
     def extension_changed(self):
+        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
+            return
         self.records[self.cur_idx()][4] = self.extension.toPlainText()
 
     def example_changed(self):
+        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
+            return
         self.records[self.cur_idx()][5] = self.example.toPlainText()  # bold won't be saved as html
 
     def hint_changed(self):
+        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
+            return
         self.records[self.cur_idx()][7] = self.hint.toPlainText()
 
     def save_all_clicked(self):
@@ -253,6 +275,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.pronSamantha.setEnabled(value)
         self.pronDaniel.setEnabled(value)
         self.paraphrase.setEnabled(value)
+        self.imageLabel.setEnabled(value)
         self.extension.setEnabled(value)
         self.example.setEnabled(value)
         self.source.setEnabled(value)
