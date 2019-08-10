@@ -1,5 +1,6 @@
 import subprocess
 import os
+import html
 
 
 class AnkiImporter:
@@ -45,12 +46,12 @@ class AnkiImporter:
 
     def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint):
         self.f.write("\t".join([
-            subject,
-            pronunciation,
-            paraphrase,
-            extension,
-            example,
-            hint
+            html.escape(subject).replace("\n", "<br>").replace("\r", "<br>"),
+            html.escape(pronunciation).replace("\n", "<br>").replace("\r", "<br>"),
+            html.escape(paraphrase).replace("\n", "<br>").replace("\r", "<br>"),
+            html.escape(extension).replace("\n", "<br>").replace("\r", "<br>"),
+            html.escape(example).replace("\n", "<br>").replace("\r", "<br>"),
+            html.escape(hint).replace("\n", "<br>").replace("\r", "<br>")
         ]) + "\n")
 
     def close_file(self):

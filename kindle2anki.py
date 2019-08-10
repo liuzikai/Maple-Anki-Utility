@@ -13,13 +13,14 @@ output_path_ = "/Users/liuzikai/Desktop"
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
 
-    def __init__(self, db_file, output_path, new_only=True, parent=None):
+    def __init__(self, app, db_file, output_path, parent=None):
 
         # Setup UI
 
         super(MapleUtility, self).__init__(parent)
         self.setupUi(self)
 
+        self.app = app
         self.setCentralWidget(self.mainWidget)
         self.nextButton.clicked.connect(self.next_click)
         self.discardButton.clicked.connect(self.discard_click)
@@ -36,21 +37,37 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.next_shortcut.activated.connect(self.next_click)
         self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_click)
+        self.imageLabel.mousePressEvent = self.image_click
+        self.reloadDB.clicked.connect(self.reload_click)
+        self.saveBar.setVisible(False)
 
         # Setup data
 
         self.db = KindleDB(db_file)
         self.output_path = output_path
         self.importer = AnkiImporter()
+        self.saving = False
+        self.has_changed = False
 
-        self.entries = self.db.fetch_all(new_only)
+        self.entries = []
+        self.records = []
+        self.discard_count = 0
+        self.confirmed_count = 0
+
+        self.reload_data()
+
+    def reload_data(self):
+
+        self.entries = self.db.fetch_all(new_only=True)
         self.records = []
         self.discard_count = 0
         self.confirmed_count = 0
 
         self.entryList.clear()
+        QtCore.QCoreApplication.processEvents()
+
         for (word_id, word, usage, title, authors, category) in self.entries:
-            # (status, subject, pronunciation, paraphrase, extension, usage, source, hint)
+            # (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img)
             self.records.append([
                 -0xFF,  # undefined value, for set_record_status() to work properly
                 word,
@@ -59,20 +76,28 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 "",
                 usage,  # plain text, bold will be applied at load_entry()
                 '<div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (title, authors),  # read-only
-                ""
+                "",
+                None  # no image
             ])
 
             self.entryList.addItem(word)
             self.set_record_status(self.entryList.count() - 1, 0)
 
-        self.saving = False
+        self.has_changed = False
 
         # Setup initial entry, must be after necessary initialization
-
         self.entryList.setCurrentRow(0)
         self.load_entry(self.cur_idx())
-
         self.update_progress_bar()
+
+    def confirm_before_action(self, action_name):
+        if self.has_changed:
+            quit_msg = "Are you sure you want to %s? Unsaved edit will be lost." % action_name
+            reply = QtWidgets.QMessageBox.question(self, 'Message',
+                                                   quit_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+            return reply == QtWidgets.QMessageBox.Yes
+        else:
+            return True
 
     def cur_idx(self):
         return self.entryList.currentRow()
@@ -87,6 +112,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         if self.records[idx][0] == status:
             return
+
+        self.has_changed = True
 
         f = self.entryList.font()
         if status == 0:  # unread
@@ -119,11 +146,19 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.records[idx][0] = status
 
     def update_progress_bar(self):
-        self.progressBar.setMaximum(len(self.records))
-        self.progressBar.setValue(self.confirmed_count + self.discard_count)
+        self.unreadBar.setMaximum(len(self.records))
+        self.unreadBar.setValue(len(self.records) - (self.confirmed_count + self.discard_count))
+        self.confirmedBar.setMaximum(len(self.records))
+        self.confirmedBar.setValue(self.confirmed_count)
+        self.discardBar.setMaximum(len(self.records))
+        self.discardBar.setValue(self.discard_count)
 
     def load_entry(self, idx):
-        (status, subject, pronunciation, paraphrase, extension, usage, source, hint) = self.records[idx]
+
+        if idx < 0 or idx >= len(self.records):
+            return
+
+        (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img) = self.records[idx]
 
         self.subject.document().setPlainText(subject)  # subject change will lead to opening of dictionary
 
@@ -140,6 +175,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.example.document().setHtml(usage.replace(subject, u"<b>%s</b>" % subject))  # bold won't be saved as html
         self.source.document().setHtml(source)  # read-only
         self.hint.document().setPlainText(hint)
+
+        if img:
+            self.imageLabel.setPixmap(img)
+        else:
+            self.imageLabel.setText("Click \nto paste \nimage")
 
     def move_to_next(self):
         if self.cur_idx() < len(self.entries) - 1:
@@ -221,17 +261,18 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def save_all(self):
 
         self.set_gui_enabled(False)
-        self.progressBar.setMaximum(len(self.records))
+        self.saveBar.setVisible(True)
+        self.saveBar.setMaximum(len(self.records))
         self.saving = True
 
         save_file = "%s/kindle-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
         self.importer.open_file(save_file)
         for i in range(len(self.records)):
 
-            (status, subject, pronunciation, paraphrase, extension, usage, source, hint) = self.records[i]
+            (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img) = self.records[i]
 
             # Set UI
-            self.progressBar.setValue(i)
+            self.saveBar.setValue(i)
             self.entryList.setCurrentRow(i)
             QtCore.QCoreApplication.processEvents()
 
@@ -239,7 +280,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             if status == 1:  # confirmed
                 example = '%s<br>%s' % (usage, source)
                 mp3 = self.importer.generate_media(subject, pronunciation)
-                self.importer.write_entry(subject.replace("\n", "<br>"), "[sound:%s]" % mp3, paraphrase, extension, example, hint)
+                if img:
+                    img_file = self.importer.new_random_filename("png")
+                    img.save("%s/%s" % (self.importer.media_path, img_file))
+                    paraphrase += '<div><br><img src="%s"><br></div>' % img_file
+                self.importer.write_entry(subject,
+                                          "[sound:%s]" % mp3,
+                                          paraphrase,
+                                          extension,
+                                          example,
+                                          hint)
 
             # Write back to DB
             if status != 0:
@@ -248,21 +298,30 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.importer.close_file()
 
         self.set_gui_enabled(True)
-        self.progressBar.setValue(len(self.records))
+        self.saveBar.setVisible(False)
+        self.saveBar.setValue(len(self.records))
         self.saving = False
+        self.has_changed = False
 
         return save_file
 
     def closeEvent(self, event):
 
-        quit_msg = "Are you sure you want to exit the program? Unsaved edit will be lost."
-        reply = QtWidgets.QMessageBox.question(self, 'Message',
-                                               quit_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
-
-        if reply == QtWidgets.QMessageBox.Yes:
+        if self.confirm_before_action("exit"):
             event.accept()
         else:
             event.ignore()
+
+    def image_click(self, event):
+        mine_data = app.clipboard().mimeData()
+        if mine_data.hasImage():
+            px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height())
+            self.records[self.cur_idx()][8] = px
+            self.imageLabel.setPixmap(px)
+
+    def reload_click(self):
+        if self.confirm_before_action("reload database"):
+            self.reload_data()
 
 
 if __name__ == '__main__':
@@ -272,7 +331,7 @@ if __name__ == '__main__':
     app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + '1024.png'))
 
     if os.path.isfile(db_file_):
-        mapleUtility = MapleUtility(db_file_, output_path_)
+        mapleUtility = MapleUtility(app, db_file_, output_path_)
         mapleUtility.show()
     else:
         msg_box = QtWidgets.QMessageBox()
