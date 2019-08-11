@@ -46,12 +46,12 @@ class AnkiImporter:
 
     def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint):
         self.f.write("\t".join([
-            html.escape(subject).replace("\n", "<br>").replace("\r", "<br>"),
-            html.escape(pronunciation).replace("\n", "<br>").replace("\r", "<br>"),
-            html.escape(paraphrase).replace("\n", "<br>").replace("\r", "<br>"),
-            html.escape(extension).replace("\n", "<br>").replace("\r", "<br>"),
-            html.escape(example).replace("\n", "<br>").replace("\r", "<br>"),
-            html.escape(hint).replace("\n", "<br>").replace("\r", "<br>")
+            subject.replace("\n", "<br>").replace("\r", "<br>"),
+            pronunciation.replace("\n", "<br>").replace("\r", "<br>"),
+            paraphrase.replace("\n", "<br>").replace("\r", "<br>"),
+            extension.replace("\n", "<br>").replace("\r", "<br>"),
+            example.replace("\n", "<br>").replace("\r", "<br>"),
+            hint.replace("\n", "<br>").replace("\r", "<br>")
         ]) + "\n")
 
     def close_file(self):
