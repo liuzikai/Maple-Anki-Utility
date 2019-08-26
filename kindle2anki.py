@@ -5,10 +5,12 @@ from anki_interface import *
 from kindle_db import *
 from datetime import datetime
 import webbrowser
+import web_interface
 
-# db_file = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
-db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
+db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
+# db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
+card_rd_threshold_ = 4
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
@@ -25,9 +27,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.nextButton.clicked.connect(self.next_click)
         self.discardButton.clicked.connect(self.discard_click)
         self.entryList.selectionModel().selectionChanged.connect(self.selected_changed)
+
+        self.subject.textChanged.connect(self.subject_changed)
+        self.freqBar.mouseDoubleClickEvent = self.freq_bar_double_click
         self.pronSamantha.clicked.connect(self.pron_clicked)
         self.pronDaniel.clicked.connect(self.pron_clicked)
-        self.subject.textChanged.connect(self.subject_changed)
         self.paraphrase.textChanged.connect(self.paraphrase_changed)
         self.extension.textChanged.connect(self.extension_changed)
         self.example.textChanged.connect(self.example_changed)
@@ -38,14 +42,21 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_click)
         self.imageLabel.mousePressEvent = self.image_click
+        self.imageLabel.mouseDoubleClickEvent = self.image_double_click
         self.reloadDB.clicked.connect(self.reload_click)
         self.saveBar.setVisible(False)
+
+        # Setup threads
+
+        self.web_worker = web_interface.WebWorker()
+        self.web_worker.finished.connect(self.set_word_freq)
 
         # Setup data
 
         self.db = KindleDB(db_file)
         self.output_path = output_path
-        self.importer = AnkiImporter()
+        self.importer_r = AnkiImporter()
+        self.importer_rd = AnkiImporter()
         self.saving = False
         self.has_changed = False
 
@@ -67,18 +78,21 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         QtCore.QCoreApplication.processEvents()
 
         for (word_id, word, usage, title, authors, category) in self.entries:
-            # (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img)
-            self.records.append([
-                -0xFF,  # undefined value, for set_record_status() to work properly
-                word,
-                "Unknown",
-                "",
-                "",
-                usage,  # plain text, bold will be applied at load_entry()
-                '<div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (title, authors),  # read-only
-                "",
-                None  # no image
-            ])
+            self.records.append({
+                "status": -0xFF,  # undefined value, for set_record_status() to work properly
+                "subject": word,
+                "pron": "Unknown",
+                "para": "",
+                "ext": "",
+                "usage": usage,  # plain text, bold will be applied at load_entry()
+                "source": '<div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (title, authors),
+                # read-only
+                "hint": "",
+                "img": None,  # no image
+                "freq": 0,
+                "card": 0,
+                "tips": ""
+            })
 
             self.entryList.addItem(word)
             self.set_record_status(self.entryList.count() - 1, 0)
@@ -120,7 +134,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         :return:
         """
 
-        if self.records[idx][0] == status:
+        if self.records[idx]["status"] == status:
             return
 
         self.has_changed = True
@@ -131,9 +145,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             f.setItalic(False)
             f.setStrikeOut(False)
 
-            if self.records[idx][0] == 1:
+            if self.records[idx]["status"] == 1:
                 self.confirmed_count -= 1
-            elif self.records[idx][0] == -1:
+            elif self.records[idx]["status"] == -1:
                 self.discard_count -= 1
 
         elif status == 1:  # confirmed
@@ -153,7 +167,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.entryList.item(idx).setFont(f)
         self.update_progress_bar()
 
-        self.records[idx][0] = status
+        self.records[idx]["status"] = status
 
     def update_progress_bar(self):
         self.unreadBar.setMaximum(len(self.records))
@@ -168,33 +182,42 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if idx < 0 or idx >= len(self.records):
             return
 
-        (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img) = self.records[idx]
+        r = self.records[idx]
 
-        self.subject.document().setPlainText(subject)  # subject change will lead to opening of dictionary
+        self.subject.document().setPlainText(r["subject"])  # subject change will lead to opening of dictionary
 
-        if pronunciation == "Samantha":
+        if r["pron"] == "Samantha":
             self.pronSamantha.toggle()
-        elif pronunciation == "Daniel":
+        elif r["pron"] == "Daniel":
             self.pronDaniel.toggle()
         else:
             if not self.saving:
                 self.pronSamantha.click()  # including toggling and first-time pronouncing
 
-        self.paraphrase.document().setPlainText(paraphrase)
-        self.extension.document().setPlainText(extension)
-        self.example.document().setHtml(usage.replace(subject, u"<b>%s</b>" % subject))  # bold won't be saved as html
-        self.source.document().setHtml(source)  # read-only
-        self.hint.document().setPlainText(hint)
+        if r["freq"] == 0 and not self.saving:
+            self.web_worker.query(idx, r["subject"])
+            # Later freqBar and cardType will be updated by set_word_freq() slot
 
-        if img:
-            self.imageLabel.setPixmap(img)
+        self.freqBar.setValue(r["freq"])
+        self.freqBar.setToolTip(r["tips"])
+        self.cardType.setCurrentIndex(r["card"])
+
+        self.paraphrase.document().setPlainText(r["para"])
+        self.extension.document().setPlainText(r["ext"])
+        self.example.document().setHtml(
+            r["usage"].replace(r["subject"], u"<b>%s</b>" % r["subject"]))  # bold won't be saved as html
+        self.source.document().setHtml(r["source"])  # read-only
+        self.hint.document().setPlainText(r["hint"])
+
+        if r["img"]:
+            self.imageLabel.setPixmap(r["img"])
         else:
             self.imageLabel.setText("Click \nto paste \nimage")
 
     def move_to_next(self):
         if self.cur_idx() < len(self.entries) - 1:
             self.entryList.setCurrentRow(self.cur_idx() + 1)
-            # loading data will be completed by selected_changed()
+            # Loading data will be completed by selected_changed()
 
     def next_click(self):
         self.set_record_status(self.cur_idx(), 1)  # confirmed
@@ -212,14 +235,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             return
         sender = self.sender()
         if sender:
-            AnkiImporter.pronounce(self.records[self.cur_idx()][1], sender.text())
-            self.records[self.cur_idx()][2] = sender.text()
+            AnkiImporter.pronounce(self.records[self.cur_idx()]["subject"], sender.text())
+            self.records[self.cur_idx()]["pron"] = sender.text()
 
     def subject_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
         subject = self.subject.toPlainText()
-        self.records[self.cur_idx()][1] = subject
+        self.records[self.cur_idx()]["subject"] = subject
         self.entryList.item(self.cur_idx()).setText(subject)
         if not self.saving:
             webbrowser.open("dict://%s" % subject, autoraise=False)
@@ -228,22 +251,22 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def paraphrase_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()][3] = self.paraphrase.toPlainText()
+        self.records[self.cur_idx()]["para"] = self.paraphrase.toPlainText()
 
     def extension_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()][4] = self.extension.toPlainText()
+        self.records[self.cur_idx()]["ext"] = self.extension.toPlainText()
 
     def example_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()][5] = self.example.toPlainText()  # bold won't be saved as html
+        self.records[self.cur_idx()]["usage"] = self.example.toPlainText()  # bold won't be saved as html
 
     def hint_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()][7] = self.hint.toPlainText()
+        self.records[self.cur_idx()]["hint"] = self.hint.toPlainText()
 
     def save_all_clicked(self):
 
@@ -288,11 +311,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.saveBar.setMaximum(len(self.records))
         self.saving = True
 
-        save_file = "%s/kindle-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-        self.importer.open_file(save_file)
+        save_file_r = "%s/kindle-r-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+        save_file_rd = "%s/kindle-rd-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+        self.importer_r.open_file(save_file_r)
+        self.importer_rd.open_file(save_file_rd)
         for i in range(len(self.records)):
 
-            (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img) = self.records[i]
+            # (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img) = self.records[i]
+            r = self.records[i]
 
             # Set UI
             self.saveBar.setValue(i)
@@ -300,25 +326,33 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             QtCore.QCoreApplication.processEvents()
 
             # Generate data
-            if status == 1:  # confirmed
-                example = '%s<br>%s' % (usage, source)
-                mp3 = self.importer.generate_media(subject, pronunciation)
-                if img:
-                    img_file = self.importer.new_random_filename("png")
-                    img.save("%s/%s" % (self.importer.media_path, img_file))
-                    paraphrase += '<div><br><img src="%s"><br></div>' % img_file
-                self.importer.write_entry(subject,
-                                          "[sound:%s]" % mp3,
-                                          paraphrase,
-                                          extension,
-                                          example,
-                                          hint)
+            if r["status"] == 1:  # confirmed
+
+                # Select proper importer
+                if r["card"] == 0:
+                    importer = self.importer_r
+                else:
+                    importer = self.importer_rd
+
+                example = '%s<br>%s' % (r["usage"], r["source"])
+                mp3 = importer.generate_media(r["subject"], r["pron"])
+                if r["img"]:
+                    img_file = importer.new_random_filename("png")
+                    r["img"].save("%s/%s" % (importer.media_path, img_file))
+                    r["para"] += '<div><br><img src="%s"><br></div>' % img_file
+                importer.write_entry(r["subject"],
+                                     "[sound:%s]" % mp3,
+                                     r["para"],
+                                     r["ext"],
+                                     example,
+                                     r["hint"])
 
             # Write back to DB
-            if status != 0:
+            if r["status"] != 0:
                 self.db.set_word_mature(self.entries[i][0], 100)
 
-        self.importer.close_file()
+        self.importer_r.close_file()
+        self.importer_rd.close_file()
 
         self.set_gui_enabled(True)
         self.saveBar.setVisible(False)
@@ -326,7 +360,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.saving = False
         self.has_changed = False
 
-        return save_file
+        return "\n\n" + save_file_r + "\n\n" + save_file_rd
 
     def closeEvent(self, event):
 
@@ -336,22 +370,46 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             event.ignore()
 
     def image_click(self, event):
-        mine_data = app.clipboard().mimeData()
-        if mine_data.hasImage():
-            px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height())
-            self.records[self.cur_idx()][8] = px
-            self.imageLabel.setPixmap(px)
+        if event.button() == QtCore.Qt.LeftButton:
+            mine_data = app.clipboard().mimeData()
+            if mine_data.hasImage():
+                px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height())
+                self.records[self.cur_idx()]["img"] = px
+                self.imageLabel.setPixmap(px)
+        elif event.button() == QtCore.Qt.RightButton:
+            webbrowser.open("https://www.google.com/search?tbm=isch&q=" + self.records[self.cur_idx()]["subject"])
+
+    def image_double_click(self, event):
+        self.records[self.cur_idx()]["img"] = None
+        self.imageLabel.setText("Click \nto paste \nimage")
 
     def reload_click(self):
         if self.confirm_before_action("reload database"):
             self.reload_data()
+
+    def freq_bar_double_click(self, event):
+        webbrowser.open(web_interface.collins_url + self.records[self.cur_idx()]["subject"])
+
+    @QtCore.pyqtSlot(int, int, str)
+    def set_word_freq(self, idx, freq, tips):
+        self.records[idx]["freq"] = freq
+        if freq >= card_rd_threshold_:
+            self.records[idx]["card"] = 1
+        else:
+            self.records[idx]["card"] = 0
+        self.records[idx]["tips"] = tips
+
+        if idx == self.cur_idx():
+            self.freqBar.setValue(freq)
+            self.freqBar.setToolTip(tips)
+            self.cardType.setCurrentIndex(self.records[idx]["card"])
 
 
 if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + '1024.png'))
+    app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
 
     if os.path.isfile(db_file_):
         mapleUtility = MapleUtility(app, db_file_, output_path_)

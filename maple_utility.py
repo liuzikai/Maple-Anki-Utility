@@ -11,9 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MapleUtility(object):
     def setupUi(self, MapleUtility):
         MapleUtility.setObjectName("MapleUtility")
-        MapleUtility.resize(753, 686)
+        MapleUtility.resize(749, 710)
         self.mainWidget = QtWidgets.QWidget(MapleUtility)
-        self.mainWidget.setGeometry(QtCore.QRect(12, 12, 729, 662))
+        self.mainWidget.setGeometry(QtCore.QRect(12, 12, 725, 686))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -123,14 +123,50 @@ class Ui_MapleUtility(object):
         self.label = QtWidgets.QLabel(self.editWidget)
         self.label.setObjectName("label")
         self.verticalLayout_3.addWidget(self.label)
-        self.subject = QtWidgets.QPlainTextEdit(self.editWidget)
+        self.widget_4 = QtWidgets.QWidget(self.editWidget)
+        self.widget_4.setObjectName("widget_4")
+        self.horizontalLayout_5 = QtWidgets.QHBoxLayout(self.widget_4)
+        self.horizontalLayout_5.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_5.setObjectName("horizontalLayout_5")
+        self.subject = QtWidgets.QPlainTextEdit(self.widget_4)
         self.subject.setMinimumSize(QtCore.QSize(0, 47))
         self.subject.setMaximumSize(QtCore.QSize(16777215, 47))
         font = QtGui.QFont()
         font.setPointSize(30)
         self.subject.setFont(font)
         self.subject.setObjectName("subject")
-        self.verticalLayout_3.addWidget(self.subject)
+        self.horizontalLayout_5.addWidget(self.subject)
+        self.freqBar = QtWidgets.QProgressBar(self.widget_4)
+        self.freqBar.setMaximumSize(QtCore.QSize(16777215, 47))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.freqBar.setFont(font)
+        self.freqBar.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.freqBar.setStyleSheet("QProgressBar {\n"
+"    text-align: center;\n"
+"    background-color: rgba(0, 0, 0, 25);\n"
+"    border-radius: 3px;\n"
+"    height: 6px;\n"
+"}\n"
+"\n"
+"QProgressBar::chunk {\n"
+"     background-color: rgb(10, 95, 255);\n"
+"     border-radius: 3px;\n"
+" }")
+        self.freqBar.setMaximum(5)
+        self.freqBar.setProperty("value", 2)
+        self.freqBar.setOrientation(QtCore.Qt.Vertical)
+        self.freqBar.setObjectName("freqBar")
+        self.horizontalLayout_5.addWidget(self.freqBar)
+        self.cardType = QtWidgets.QComboBox(self.widget_4)
+        self.cardType.setMaximumSize(QtCore.QSize(75, 16777215))
+        self.cardType.setObjectName("cardType")
+        self.cardType.addItem("")
+        self.cardType.addItem("")
+        self.horizontalLayout_5.addWidget(self.cardType)
+        self.verticalLayout_3.addWidget(self.widget_4)
         self.label_2 = QtWidgets.QLabel(self.editWidget)
         self.label_2.setObjectName("label_2")
         self.verticalLayout_3.addWidget(self.label_2)
@@ -249,6 +285,10 @@ class Ui_MapleUtility(object):
         self.label_10.setText(_translate("MapleUtility", "Discarded"))
         self.label.setText(_translate("MapleUtility", "Subject"))
         self.subject.setPlainText(_translate("MapleUtility", "Subject"))
+        self.freqBar.setFormat(_translate("MapleUtility", "%v"))
+        self.cardType.setCurrentText(_translate("MapleUtility", "R"))
+        self.cardType.setItemText(0, _translate("MapleUtility", "R"))
+        self.cardType.setItemText(1, _translate("MapleUtility", "RD"))
         self.label_2.setText(_translate("MapleUtility", "Pronunciation"))
         self.pronSamantha.setText(_translate("MapleUtility", "Samantha"))
         self.pronDaniel.setText(_translate("MapleUtility", "Daniel"))
@@ -258,6 +298,7 @@ class Ui_MapleUtility(object):
 "p, li { white-space: pre-wrap; }\n"
 "</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:20pt; font-weight:400; font-style:normal;\">\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Paraphrase</p></body></html>"))
+        self.imageLabel.setToolTip(_translate("MapleUtility", "Right click to search image on Google Image"))
         self.imageLabel.setText(_translate("MapleUtility", "Image"))
         self.label_4.setText(_translate("MapleUtility", "Extension"))
         self.extension.setPlainText(_translate("MapleUtility", "Extension\n"
