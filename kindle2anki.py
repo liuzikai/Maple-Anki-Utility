@@ -1,14 +1,14 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtCore import QTimer
 from maple_utility import *
 from anki_interface import *
 from kindle_db import *
 from datetime import datetime
-import webbrowser
 import web_interface
 
-db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
-# db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
+# db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
+db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
 
@@ -46,10 +46,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.reloadDB.clicked.connect(self.reload_click)
         self.saveBar.setVisible(False)
 
-        # Setup threads
+        # Setup threads and timers
 
-        self.web_worker = web_interface.WebWorker()
+        self.web_worker = web_interface.CollinsWorker()
         self.web_worker.finished.connect(self.set_word_freq)
+        self.mac_dict_worker = web_interface.MacDictWorker()
+        self.mac_dict_worker.finished.connect(self.after_opening_mac_dict)
 
         # Setup data
 
@@ -57,7 +59,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.output_path = output_path
         self.importer_r = AnkiImporter()
         self.importer_rd = AnkiImporter()
-        self.saving = False
+        self.is_saving = False
         self.has_changed = False
 
         self.entries = []
@@ -140,6 +142,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.has_changed = True
 
         f = self.entryList.font()
+
         if status == 0:  # unread
 
             f.setItalic(False)
@@ -170,11 +173,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.records[idx]["status"] = status
 
     def update_progress_bar(self):
-        self.unreadBar.setMaximum(len(self.records))
-        self.unreadBar.setValue(len(self.records) - (self.confirmed_count + self.discard_count))
-        self.confirmedBar.setMaximum(len(self.records))
+        record_count = len(self.records)
+        self.unreadBar.setMaximum(record_count)
+        self.unreadBar.setValue(record_count - (self.confirmed_count + self.discard_count))
+        self.confirmedBar.setMaximum(record_count)
         self.confirmedBar.setValue(self.confirmed_count)
-        self.discardBar.setMaximum(len(self.records))
+        self.discardBar.setMaximum(record_count)
         self.discardBar.setValue(self.discard_count)
 
     def load_entry(self, idx):
@@ -191,11 +195,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         elif r["pron"] == "Daniel":
             self.pronDaniel.toggle()
         else:
-            if not self.saving:
+            if not self.is_saving:
                 self.pronSamantha.click()  # including toggling and first-time pronouncing
 
-        if r["freq"] == 0 and not self.saving:
+        if r["freq"] == 0 and not self.is_saving:
             self.web_worker.query(idx, r["subject"])
+            self.freqBar.setMaximum(0)
             # Later freqBar and cardType will be updated by set_word_freq() slot
 
         self.freqBar.setValue(r["freq"])
@@ -235,38 +240,42 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             return
         sender = self.sender()
         if sender:
-            AnkiImporter.pronounce(self.records[self.cur_idx()]["subject"], sender.text())
-            self.records[self.cur_idx()]["pron"] = sender.text()
+            AnkiImporter.pronounce(self.cur_record()["subject"], sender.text())
+            self.cur_record()["pron"] = sender.text()
+
+    def cur_record(self):
+        return self.records[self.cur_idx()]
 
     def subject_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
         subject = self.subject.toPlainText()
-        self.records[self.cur_idx()]["subject"] = subject
+        self.cur_record()["subject"] = subject
         self.entryList.item(self.cur_idx()).setText(subject)
-        if not self.saving:
-            webbrowser.open("dict://%s" % subject, autoraise=False)
-            self.raise_()
+        if not self.is_saving:
+            self.mac_dict_worker.search(subject)
+            self.web_worker.query(self.cur_idx(), subject)
+            self.freqBar.setMaximum(0)
 
     def paraphrase_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()]["para"] = self.paraphrase.toPlainText()
+        self.cur_record()["para"] = self.paraphrase.toPlainText()
 
     def extension_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()]["ext"] = self.extension.toPlainText()
+        self.cur_record()["ext"] = self.extension.toPlainText()
 
     def example_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()]["usage"] = self.example.toPlainText()  # bold won't be saved as html
+        self.cur_record()["usage"] = self.example.toPlainText()  # bold won't be saved as html
 
     def hint_changed(self):
         if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
             return
-        self.records[self.cur_idx()]["hint"] = self.hint.toPlainText()
+        self.cur_record()["hint"] = self.hint.toPlainText()
 
     def save_all_clicked(self):
 
@@ -309,7 +318,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.set_gui_enabled(False)
         self.saveBar.setVisible(True)
         self.saveBar.setMaximum(len(self.records))
-        self.saving = True
+        self.is_saving = True
 
         save_file_r = "%s/kindle-r-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
         save_file_rd = "%s/kindle-rd-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
@@ -357,7 +366,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.set_gui_enabled(True)
         self.saveBar.setVisible(False)
         self.saveBar.setValue(len(self.records))
-        self.saving = False
+        self.is_saving = False
         self.has_changed = False
 
         return "\n\n" + save_file_r + "\n\n" + save_file_rd
@@ -373,14 +382,15 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if event.button() == QtCore.Qt.LeftButton:
             mine_data = app.clipboard().mimeData()
             if mine_data.hasImage():
-                px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height())
-                self.records[self.cur_idx()]["img"] = px
+                px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height(),
+                                                                         mode=QtCore.Qt.SmoothTransformation)
+                self.cur_record()["img"] = px
                 self.imageLabel.setPixmap(px)
         elif event.button() == QtCore.Qt.RightButton:
-            webbrowser.open("https://www.google.com/search?tbm=isch&q=" + self.records[self.cur_idx()]["subject"])
+            web_interface.open_google_image_website(self.cur_record()["subject"])
 
     def image_double_click(self, event):
-        self.records[self.cur_idx()]["img"] = None
+        self.cur_record()["img"] = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
     def reload_click(self):
@@ -388,7 +398,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.reload_data()
 
     def freq_bar_double_click(self, event):
-        webbrowser.open(web_interface.collins_url + self.records[self.cur_idx()]["subject"])
+        web_interface.open_collins_website(self.cur_record()["subject"])
 
     @QtCore.pyqtSlot(int, int, str)
     def set_word_freq(self, idx, freq, tips):
@@ -400,9 +410,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.records[idx]["tips"] = tips
 
         if idx == self.cur_idx():
+            self.freqBar.setMaximum(5)
             self.freqBar.setValue(freq)
             self.freqBar.setToolTip(tips)
             self.cardType.setCurrentIndex(self.records[idx]["card"])
+
+    @QtCore.pyqtSlot(str)
+    def after_opening_mac_dict(self, word):
+        self.raise_()
 
 
 if __name__ == '__main__':

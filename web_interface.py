@@ -1,7 +1,6 @@
-import typing
-
 import requests
 from pyquery import PyQuery as pq
+import webbrowser
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 
 collins_url = "https://www.collinsdictionary.com/dictionary/english/"
@@ -20,7 +19,11 @@ def query_collins_word_frequency(word):
         return 0, str(err)
 
 
-class WebWorker(QThread):
+def open_collins_website(word):
+    webbrowser.open(collins_url + word)
+
+
+class CollinsWorker(QThread):
 
     finished = pyqtSignal(int, int, str)
 
@@ -43,6 +46,41 @@ class WebWorker(QThread):
         self.finished.emit(self.idx, freq, tips)
 
 
+google_image_url = "https://www.google.com/search?tbm=isch&q="
+
+
+def open_google_image_website(word):
+    webbrowser.open(google_image_url + word)
+
+
+mac_dict_url = "dict://"
+
+
+def open_mac_dict(word):
+    webbrowser.open(mac_dict_url + word, autoraise=False)
+
+
+class MacDictWorker(QThread):
+
+    finished = pyqtSignal(str)
+
+    def __init__(self):
+        QThread.__init__(self)
+        self.word = None
+
+    def __del__(self):
+        self.wait()
+
+    def search(self, word):
+        self.word = word
+        self.start()
+
+    def run(self):
+        open_mac_dict(self.word)
+        self.finished.emit(self.word)
+
+
 if __name__ == '__main__':
     word = input("Please input a word: ")
-    print("Word frequency of %s is %d" % (word, query_collins_word_frequency(word)))
+    (freq, tips) = query_collins_word_frequency(word)
+    print("Word frequency of %s is %d (%s)" % (word, freq, tips))

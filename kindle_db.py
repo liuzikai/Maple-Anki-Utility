@@ -1,4 +1,9 @@
 import sqlite3
+import os
+
+
+def eject_kindle_volume():
+    os.system("hdiutil unmount /Volumes/Kindle")
 
 
 class KindleDB:
@@ -16,17 +21,17 @@ class KindleDB:
         return self.conn.execute(
             """
             SELECT
-              ws.id,
-              ws.word,
-              lus.usage,
-              bi.title,
-              bi.authors,
-              ws.category
-            FROM WORDS AS ws
-              LEFT JOIN LOOKUPS AS lus ON ws.id = lus.word_key
-              LEFT JOIN BOOK_INFO AS bi ON lus.book_key = bi.id
+              WORDS.id,
+              WORDS.word,
+              LOOKUPS.usage,
+              BOOK_INFO.title,
+              BOOK_INFO.authors,
+              WORDS.category
+            FROM WORDS
+              LEFT JOIN LOOKUPS ON WORDS.id = LOOKUPS.word_key
+              LEFT JOIN BOOK_INFO ON LOOKUPS.book_key = BOOK_INFO.id
             {}
-            """.format("WHERE ws.category = 0" if new_only else "")
+            """.format("WHERE WORDS.category = 0" if new_only else "")
         ).fetchall()
 
     def set_word_mature(self, word_id, category):
