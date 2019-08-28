@@ -1,26 +1,32 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 import requests
 from pyquery import PyQuery as pq
 import webbrowser
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
+import urllib.parse
 
-collins_url = "https://www.collinsdictionary.com/dictionary/english/"
+collins_url = u"https://www.collinsdictionary.com/dictionary/english/"
 
 
 def query_collins_word_frequency(word):
     try:
-        url = collins_url + word
+        url = collins_url + urllib.parse.quote(word)
         doc = pq(requests.get(url).text.encode('utf-8'))
         freq_obj = doc(".word-frequency-img")
         if freq_obj is None:
             return 0, "Fail to find the word"
-        else:
-            return int(freq_obj.attr("data-band")), freq_obj.attr("title")
+        freq_attr = freq_obj.attr("data-band")
+        if freq_attr is None:
+            return 0, "Fail to find the word"
+        return int(freq_attr), freq_obj.attr("title")
     except Exception as err:
         return 0, str(err)
 
 
 def open_collins_website(word):
-    webbrowser.open(collins_url + word)
+    webbrowser.open(collins_url + urllib.parse.quote(word))
 
 
 class CollinsWorker(QThread):
@@ -46,18 +52,18 @@ class CollinsWorker(QThread):
         self.finished.emit(self.idx, freq, tips)
 
 
-google_image_url = "https://www.google.com/search?tbm=isch&q="
+google_image_url = u"https://www.google.com/search?tbm=isch&q="
 
 
 def open_google_image_website(word):
-    webbrowser.open(google_image_url + word)
+    webbrowser.open(google_image_url + urllib.parse.quote(word))
 
 
-mac_dict_url = "dict://"
+mac_dict_url = u"dict://"
 
 
 def open_mac_dict(word):
-    webbrowser.open(mac_dict_url + word, autoraise=False)
+    webbrowser.open(mac_dict_url + urllib.parse.quote(word), autoraise=False)
 
 
 class MacDictWorker(QThread):

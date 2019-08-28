@@ -1,16 +1,27 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
-from PyQt5.QtCore import QTimer
+from datetime import datetime
+from enum import Enum
 from maple_utility import *
 from anki_interface import *
 from kindle_db import *
-from datetime import datetime
 import web_interface
+
 
 # db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
 db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
+
+
+class RecordStatus(Enum):
+    UNVIEWED = -1
+    TOPROCESS = 0
+    CONFIRMED = 1
+    DISCARDED = 2
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
@@ -76,12 +87,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discard_count = 0
         self.confirmed_count = 0
 
+        self.entryList.blockSignals(True)
         self.entryList.clear()
         QtCore.QCoreApplication.processEvents()
 
         for (word_id, word, usage, title, authors, category) in self.entries:
             self.records.append({
-                "status": -0xFF,  # undefined value, for set_record_status() to work properly
+                "status": RecordStatus.UNVIEWED,
                 "subject": word,
                 "pron": "Unknown",
                 "para": "",
@@ -96,8 +108,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 "tips": ""
             })
 
-            self.entryList.addItem(word)
-            self.set_record_status(self.entryList.count() - 1, 0)
+            self.entryList.addItem(word)  # signals has been blocked
 
         self.has_changed = False
 
@@ -114,7 +125,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.source.document().setPlainText("")
             self.hint.document().setPlainText("")
             self.set_gui_enabled(False)
+
         self.update_progress_bar()
+        self.entryList.blockSignals(False)
 
     def confirm_before_action(self, action_name):
         if self.has_changed:
@@ -132,35 +145,36 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         """
         Set UI and record entry
         :param idx:
-        :param status: 0 - unread, -1 - discard, 1 confirmed
+        :param status: one of RecordStatus
         :return:
         """
 
         if self.records[idx]["status"] == status:
             return
 
-        self.has_changed = True
+        if status == RecordStatus.CONFIRMED or status == RecordStatus.DISCARDED:
+            self.has_changed = True
 
         f = self.entryList.font()
 
-        if status == 0:  # unread
+        if status == RecordStatus.TOPROCESS:
 
             f.setItalic(False)
             f.setStrikeOut(False)
 
-            if self.records[idx]["status"] == 1:
+            if self.records[idx]["status"] == RecordStatus.CONFIRMED:
                 self.confirmed_count -= 1
-            elif self.records[idx]["status"] == -1:
+            elif self.records[idx]["status"] == RecordStatus.DISCARDED:
                 self.discard_count -= 1
 
-        elif status == 1:  # confirmed
+        elif status == RecordStatus.CONFIRMED:
 
             f.setItalic(True)
             f.setStrikeOut(False)
 
             self.confirmed_count += 1
 
-        elif status == -1:  # discarded
+        elif status == RecordStatus.DISCARDED:
 
             f.setItalic(False)
             f.setStrikeOut(True)
@@ -188,20 +202,24 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         r = self.records[idx]
 
-        self.subject.document().setPlainText(r["subject"])  # subject change will lead to opening of dictionary
+        if not self.is_saving:
+            self.mac_dict_worker.search(r["subject"])
+            if r["status"] == RecordStatus.UNVIEWED:
+                self.pronSamantha.click()  # including toggling and first-time pronouncing
+                self.set_record_status(idx, RecordStatus.TOPROCESS)
+            if r["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time and got nothing
+                self.web_worker.query(idx, r["subject"])
+                self.freqBar.setMaximum(0)
+                # Later freqBar and cardType will be updated by set_word_freq() slot
+
+        self.editor_block_signals(True)
+
+        self.subject.document().setPlainText(r["subject"])
 
         if r["pron"] == "Samantha":
             self.pronSamantha.toggle()
         elif r["pron"] == "Daniel":
             self.pronDaniel.toggle()
-        else:
-            if not self.is_saving:
-                self.pronSamantha.click()  # including toggling and first-time pronouncing
-
-        if r["freq"] == 0 and not self.is_saving:
-            self.web_worker.query(idx, r["subject"])
-            self.freqBar.setMaximum(0)
-            # Later freqBar and cardType will be updated by set_word_freq() slot
 
         self.freqBar.setValue(r["freq"])
         self.freqBar.setToolTip(r["tips"])
@@ -219,25 +237,25 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         else:
             self.imageLabel.setText("Click \nto paste \nimage")
 
+        self.editor_block_signals(False)
+
     def move_to_next(self):
         if self.cur_idx() < len(self.entries) - 1:
             self.entryList.setCurrentRow(self.cur_idx() + 1)
             # Loading data will be completed by selected_changed()
 
     def next_click(self):
-        self.set_record_status(self.cur_idx(), 1)  # confirmed
+        self.set_record_status(self.cur_idx(), RecordStatus.CONFIRMED)
         self.move_to_next()
 
     def discard_click(self):
-        self.set_record_status(self.cur_idx(), -1)  # discarded
+        self.set_record_status(self.cur_idx(), RecordStatus.DISCARDED)
         self.move_to_next()
 
     def selected_changed(self):
         self.load_entry(self.cur_idx())
 
     def pron_clicked(self):
-        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
-            return
         sender = self.sender()
         if sender:
             AnkiImporter.pronounce(self.cur_record()["subject"], sender.text())
@@ -247,34 +265,19 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         return self.records[self.cur_idx()]
 
     def subject_changed(self):
-        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
-            return
-        subject = self.subject.toPlainText()
-        self.cur_record()["subject"] = subject
-        self.entryList.item(self.cur_idx()).setText(subject)
-        if not self.is_saving:
-            self.mac_dict_worker.search(subject)
-            self.web_worker.query(self.cur_idx(), subject)
-            self.freqBar.setMaximum(0)
+        self.cur_record()["subject"] = self.subject.toPlainText()
+        self.load_entry(self.cur_idx())
 
     def paraphrase_changed(self):
-        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
-            return
         self.cur_record()["para"] = self.paraphrase.toPlainText()
 
     def extension_changed(self):
-        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
-            return
         self.cur_record()["ext"] = self.extension.toPlainText()
 
     def example_changed(self):
-        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
-            return
         self.cur_record()["usage"] = self.example.toPlainText()  # bold won't be saved as html
 
     def hint_changed(self):
-        if self.cur_idx() < 0 or self.cur_idx() >= len(self.records):
-            return
         self.cur_record()["hint"] = self.hint.toPlainText()
 
     def save_all_clicked(self):
@@ -312,10 +315,22 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.example.setEnabled(value)
         self.source.setEnabled(value)
         self.hint.setEnabled(value)
+        
+    def editor_block_signals(self, value):
+        self.subject.blockSignals(value)
+        self.pronSamantha.blockSignals(value)
+        self.pronDaniel.blockSignals(value)
+        self.paraphrase.blockSignals(value)
+        self.imageLabel.blockSignals(value)
+        self.extension.blockSignals(value)
+        self.example.blockSignals(value)
+        self.source.blockSignals(value)
+        self.hint.blockSignals(value)
 
     def save_all(self):
 
         self.set_gui_enabled(False)
+        self.editor_block_signals(True)
         self.saveBar.setVisible(True)
         self.saveBar.setMaximum(len(self.records))
         self.is_saving = True
@@ -326,7 +341,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.importer_rd.open_file(save_file_rd)
         for i in range(len(self.records)):
 
-            # (status, subject, pronunciation, paraphrase, extension, usage, source, hint, img) = self.records[i]
             r = self.records[i]
 
             # Set UI
@@ -335,7 +349,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             QtCore.QCoreApplication.processEvents()
 
             # Generate data
-            if r["status"] == 1:  # confirmed
+            if r["status"] == RecordStatus.CONFIRMED:
 
                 # Select proper importer
                 if r["card"] == 0:
@@ -357,13 +371,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                      r["hint"])
 
             # Write back to DB
-            if r["status"] != 0:
+            if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
                 self.db.set_word_mature(self.entries[i][0], 100)
 
         self.importer_r.close_file()
         self.importer_rd.close_file()
 
         self.set_gui_enabled(True)
+        self.editor_block_signals(False)
         self.saveBar.setVisible(False)
         self.saveBar.setValue(len(self.records))
         self.is_saving = False
