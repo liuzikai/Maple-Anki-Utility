@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>749</width>
-    <height>710</height>
+    <width>1403</width>
+    <height>730</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,10 +16,10 @@
   <widget class="QWidget" name="mainWidget" native="true">
    <property name="geometry">
     <rect>
-     <x>12</x>
-     <y>12</y>
-     <width>725</width>
-     <height>686</height>
+     <x>20</x>
+     <y>22</y>
+     <width>1317</width>
+     <height>846</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -648,9 +648,39 @@ p, li { white-space: pre-wrap; }
       </layout>
      </widget>
     </item>
+    <item>
+     <widget class="QWidget" name="widget_5" native="true">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QWebEngineView" name="webView" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>600</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>600</width>
+           <height>16777215</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QWebEngineView</class>
+   <extends>QWidget</extends>
+   <header>qwebengineview.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

@@ -5,6 +5,8 @@ import requests
 from pyquery import PyQuery as pq
 import webbrowser
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QUrl, QEventLoop
+from PyQt5 import QtWebEngineWidgets
 import urllib.parse
 
 collins_url = u"https://www.collinsdictionary.com/dictionary/english/"
@@ -13,7 +15,15 @@ collins_url = u"https://www.collinsdictionary.com/dictionary/english/"
 def query_collins_word_frequency(word):
     try:
         url = collins_url + urllib.parse.quote(word)
-        doc = pq(requests.get(url).text.encode('utf-8'))
+        headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"}
+        return parse_collins_word_frequency(requests.get(url, headers=headers).text.encode('utf-8'))
+    except Exception as err:
+        return 0, str(err)
+
+
+def parse_collins_word_frequency(html):
+    try:
+        doc = pq(html)
         freq_obj = doc(".word-frequency-img")
         if freq_obj is None:
             return 0, "Fail to find the word"
@@ -33,11 +43,16 @@ class CollinsWorker(QThread):
 
     finished = pyqtSignal(int, int, str)
 
-    def __init__(self):
+    toHtmlFinished = pyqtSignal()
+
+    def __init__(self, web_view):
         QThread.__init__(self)
+
+        self.web_view = web_view
 
         self.idx = None
         self.word = None
+        self.html = ""
 
     def __del__(self):
         self.wait()
@@ -82,7 +97,7 @@ class MacDictWorker(QThread):
         self.start()
 
     def run(self):
-        open_mac_dict(self.word)
+        open_collins_website(self.word)
         self.finished.emit(self.word)
 
 

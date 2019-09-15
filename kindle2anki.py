@@ -3,19 +3,23 @@
 
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 from datetime import datetime
 from enum import Enum
 from maple_utility import *
 from anki_interface import *
 from kindle_db import *
 import web_interface
+import urllib.parse
 
 
-# db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
-db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
+db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
+# db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
 
+mac_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8"
+ios_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 
 class RecordStatus(Enum):
     UNVIEWED = -1
@@ -25,6 +29,8 @@ class RecordStatus(Enum):
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
+
+    web_to_html_finished = pyqtSignal()
 
     def __init__(self, app, db_file, output_path, parent=None):
 
@@ -59,7 +65,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         # Setup threads and timers
 
-        self.web_worker = web_interface.CollinsWorker()
+        self.web_worker = web_interface.CollinsWorker(self.webView)
         self.web_worker.finished.connect(self.set_word_freq)
         self.mac_dict_worker = web_interface.MacDictWorker()
         self.mac_dict_worker.finished.connect(self.after_opening_mac_dict)
@@ -118,13 +124,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.load_entry(self.cur_idx())
             self.set_gui_enabled(True)
         else:
+            self.set_gui_enabled(False)
+            self.editor_block_signals(True)
             self.subject.document().setPlainText("Congratulation!")  # subject change will lead to opening of dictionary
             self.paraphrase.document().setPlainText("There is nothing to be processed.")
             self.extension.document().setPlainText("Great work!")
             self.example.document().setPlainText("")
             self.source.document().setPlainText("")
             self.hint.document().setPlainText("")
-            self.set_gui_enabled(False)
+            self.freqBar.setMaximum(0)
+            self.editor_block_signals(False)
 
         self.update_progress_bar()
         self.entryList.blockSignals(False)
@@ -203,12 +212,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         r = self.records[idx]
 
         if not self.is_saving:
-            self.mac_dict_worker.search(r["subject"])
+            self.load_collins(r["subject"])
             if r["status"] == RecordStatus.UNVIEWED:
                 self.pronSamantha.click()  # including toggling and first-time pronouncing
                 self.set_record_status(idx, RecordStatus.TOPROCESS)
             if r["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time and got nothing
-                self.web_worker.query(idx, r["subject"])
                 self.freqBar.setMaximum(0)
                 # Later freqBar and cardType will be updated by set_word_freq() slot
 
@@ -265,7 +273,10 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         return self.records[self.cur_idx()]
 
     def subject_changed(self):
-        self.cur_record()["subject"] = self.subject.toPlainText()
+        subject = self.subject.toPlainText()
+        self.cur_record()["subject"] = subject
+        self.cur_record()["freq"] = 0
+        self.entryList.item(self.cur_idx()).setText(subject)
         self.load_entry(self.cur_idx())
 
     def paraphrase_changed(self):
@@ -315,7 +326,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.example.setEnabled(value)
         self.source.setEnabled(value)
         self.hint.setEnabled(value)
-        
+        self.cardType.setEnabled(value)
+
     def editor_block_signals(self, value):
         self.subject.blockSignals(value)
         self.pronSamantha.blockSignals(value)
@@ -326,6 +338,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.example.blockSignals(value)
         self.source.blockSignals(value)
         self.hint.blockSignals(value)
+        self.cardType.blockSignals(value)
 
     def save_all(self):
 
@@ -368,7 +381,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                      r["para"],
                                      r["ext"],
                                      example,
-                                     r["hint"])
+                                     r["hint"],
+                                     r["freq"])
 
             # Write back to DB
             if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
@@ -402,7 +416,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 self.cur_record()["img"] = px
                 self.imageLabel.setPixmap(px)
         elif event.button() == QtCore.Qt.RightButton:
-            web_interface.open_google_image_website(self.cur_record()["subject"])
+            # web_interface.open_google_image_website(self.cur_record()["subject"])
+            self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+            self.webView.load(QtCore.QUrl(web_interface.google_image_url + urllib.parse.quote(self.cur_record()["subject"])))
 
     def image_double_click(self, event):
         self.cur_record()["img"] = None
@@ -413,9 +429,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.reload_data()
 
     def freq_bar_double_click(self, event):
-        web_interface.open_collins_website(self.cur_record()["subject"])
+        self.load_collins(self.cur_record()["subject"])  # reload website
 
-    @QtCore.pyqtSlot(int, int, str)
+    @pyqtSlot(int, int, str)
     def set_word_freq(self, idx, freq, tips):
         self.records[idx]["freq"] = freq
         if freq >= card_rd_threshold_:
@@ -430,9 +446,42 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.freqBar.setToolTip(tips)
             self.cardType.setCurrentIndex(self.records[idx]["card"])
 
-    @QtCore.pyqtSlot(str)
+    def load_collins(self, word):
+        self.webView.loadFinished.connect(self.web_load_finished)
+        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+        self.webView.load(QtCore.QUrl(web_interface.collins_url + urllib.parse.quote(word)))
+        # Wait for slot web_load_finished
+
+    @pyqtSlot(str)
     def after_opening_mac_dict(self, word):
         self.raise_()
+
+    @pyqtSlot(bool)
+    def web_load_finished(self, ok):
+        if ok:
+            self.webView.loadFinished.disconnect()
+            self.webView.page().toHtml(self.web_to_html_callback)
+        # TODO: handle the case of failure
+
+    def web_to_html_callback(self, html):
+
+        if self.cur_record()["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time
+            (freq, tips) = web_interface.parse_collins_word_frequency(html)
+            self.set_word_freq(self.cur_idx(), freq, tips)
+
+        js = """
+$('iframe').remove()
+$('.topslot_container').remove()
+$('.cB-hook').remove()
+$('#videos').remove()
+$('.socialButtons').remove()
+$('.tabsNavigation').remove()
+$('.res_cell_right').remove()
+$('.btmslot_a-container').remove()
+$('.exercise').remove()
+$('.mpuslot_b-container').remove()
+"""
+        self.webView.page().runJavaScript(js)
 
 
 if __name__ == '__main__':
@@ -443,7 +492,7 @@ if __name__ == '__main__':
 
     if os.path.isfile(db_file_):
         mapleUtility = MapleUtility(app, db_file_, output_path_)
-        mapleUtility.show()
+        mapleUtility.showMaximized()
     else:
         msg_box = QtWidgets.QMessageBox()
         msg_box.setWindowTitle("Error")

@@ -47,14 +47,15 @@ class AnkiImporter:
     def open_file(self, output_file):
         self.f = open(output_file, "w", encoding="utf-8")
 
-    def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint):
+    def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint, freq):
         self.f.write("\t".join([
             subject.replace("\n", "<br>").replace("\r", "<br>"),
             pronunciation.replace("\n", "<br>").replace("\r", "<br>"),
             paraphrase.replace("\n", "<br>").replace("\r", "<br>"),
             extension.replace("\n", "<br>").replace("\r", "<br>"),
             example.replace("\n", "<br>").replace("\r", "<br>"),
-            hint.replace("\n", "<br>").replace("\r", "<br>")
+            hint.replace("\n", "<br>").replace("\r", "<br>"),
+            str(freq)
         ]) + "\n")
 
     def close_file(self):

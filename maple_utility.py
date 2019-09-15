@@ -11,9 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MapleUtility(object):
     def setupUi(self, MapleUtility):
         MapleUtility.setObjectName("MapleUtility")
-        MapleUtility.resize(749, 710)
+        MapleUtility.resize(1403, 730)
         self.mainWidget = QtWidgets.QWidget(MapleUtility)
-        self.mainWidget.setGeometry(QtCore.QRect(12, 12, 725, 686))
+        self.mainWidget.setGeometry(QtCore.QRect(20, 22, 1317, 846))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -270,6 +270,16 @@ class Ui_MapleUtility(object):
         self.horizontalLayout_2.addWidget(self.nextButton)
         self.verticalLayout_3.addWidget(self.widget)
         self.horizontalLayout_3.addWidget(self.editWidget)
+        self.widget_5 = QtWidgets.QWidget(self.mainWidget)
+        self.widget_5.setObjectName("widget_5")
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.widget_5)
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.webView = QtWebEngineWidgets.QWebEngineView(self.widget_5)
+        self.webView.setMinimumSize(QtCore.QSize(600, 0))
+        self.webView.setMaximumSize(QtCore.QSize(600, 16777215))
+        self.webView.setObjectName("webView")
+        self.verticalLayout_2.addWidget(self.webView)
+        self.horizontalLayout_3.addWidget(self.widget_5)
 
         self.retranslateUi(MapleUtility)
         QtCore.QMetaObject.connectSlotsByName(MapleUtility)
@@ -320,3 +330,4 @@ class Ui_MapleUtility(object):
         self.discardButton.setText(_translate("MapleUtility", "Discard"))
         self.nextButton.setText(_translate("MapleUtility", "Confirm"))
 
+from PyQt5 import QtWebEngineWidgets
