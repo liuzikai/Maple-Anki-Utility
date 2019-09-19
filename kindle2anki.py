@@ -13,13 +13,14 @@ import web_interface
 import urllib.parse
 
 
-db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
-# db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
+# db_file_ = "/Users/liuzikai/Documents/Programming/Kindle2Anki/vocab.db"
+db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
 
 mac_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8"
 ios_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+
 
 class RecordStatus(Enum):
     UNVIEWED = -1
@@ -44,8 +45,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.nextButton.clicked.connect(self.next_click)
         self.discardButton.clicked.connect(self.discard_click)
         self.entryList.selectionModel().selectionChanged.connect(self.selected_changed)
-
         self.subject.textChanged.connect(self.subject_changed)
+        self.subject.installEventFilter(self)
         self.freqBar.mouseDoubleClickEvent = self.freq_bar_double_click
         self.pronSamantha.clicked.connect(self.pron_clicked)
         self.pronDaniel.clicked.connect(self.pron_clicked)
@@ -58,9 +59,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.next_shortcut.activated.connect(self.next_click)
         self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_click)
+        self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
+        self.new_entry_shortcut.activated.connect(self.add_new_entry_click)
+        # TODO: handle event using fliter
         self.imageLabel.mousePressEvent = self.image_click
         self.imageLabel.mouseDoubleClickEvent = self.image_double_click
-        self.reloadDB.clicked.connect(self.reload_click)
+        self.loadKindle.clicked.connect(self.reload_kindle_click)
+        self.newEntry.clicked.connect(self.add_new_entry_click)
+        self.clearList.clicked.connect(self.clear_list_click)
         self.saveBar.setVisible(False)
 
         # Setup threads and timers
@@ -72,23 +78,21 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         # Setup data
 
-        self.db = KindleDB(db_file)
+        self.db_file = db_file
+        self.db = None
         self.output_path = output_path
         self.importer_r = AnkiImporter()
         self.importer_rd = AnkiImporter()
         self.is_saving = False
         self.has_changed = False
 
-        self.entries = []
         self.records = []
         self.discard_count = 0
         self.confirmed_count = 0
 
-        self.reload_data()
+        self.update_ui_after_entry_count_changed()  # setup initial interface
 
-    def reload_data(self):
-
-        self.entries = self.db.fetch_all(new_only=True)
+    def clear_records(self):
         self.records = []
         self.discard_count = 0
         self.confirmed_count = 0
@@ -96,15 +100,37 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.entryList.blockSignals(True)
         self.entryList.clear()
         QtCore.QCoreApplication.processEvents()
+        self.entryList.blockSignals(False)
 
-        for (word_id, word, usage, title, authors, category) in self.entries:
+        self.update_ui_after_entry_count_changed()
+
+    def reload_kindle_data(self):
+
+        if self.db is None:
+            if os.path.isfile(self.db_file):
+                self.db = KindleDB(self.db_file)
+            else:
+                msg_box = QtWidgets.QMessageBox()
+                msg_box.setWindowTitle("Error")
+                msg_box.setText("Failed to find Kindle DB file. Please make sure Kindle has connected.")
+                msg_box.setIcon(QtWidgets.QMessageBox.Warning)
+                msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+                msg_box.exec_()
+                return
+
+        self.clear_records()
+
+        self.entryList.blockSignals(True)
+
+        for (word_id, word, usage, title, authors, category) in self.db.fetch_all(new_only=True):
             self.records.append({
                 "status": RecordStatus.UNVIEWED,
+                "word_id": word_id,
                 "subject": word,
                 "pron": "Unknown",
                 "para": "",
                 "ext": "",
-                "usage": usage,  # plain text, bold will be applied at load_entry()
+                "usage": usage,  # plain text, bold will be applied at editor_load_entry()
                 "source": '<div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (title, authors),
                 # read-only
                 "hint": "",
@@ -120,11 +146,17 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         # Setup initial entry, must be after necessary initialization
         if len(self.records) > 0:
-            self.entryList.setCurrentRow(0)
-            self.load_entry(self.cur_idx())
+            self.entryList.setCurrentRow(0)  # signal of entryList has been block, will not trigger editor_load_entry()
+            self.editor_load_entry(self.cur_idx())
+
+        self.update_ui_after_entry_count_changed()
+
+        self.entryList.blockSignals(False)
+
+    def update_ui_after_entry_count_changed(self):
+        if len(self.records) > 0:
             self.set_gui_enabled(True)
         else:
-            self.set_gui_enabled(False)
             self.editor_block_signals(True)
             self.subject.document().setPlainText("Congratulation!")  # subject change will lead to opening of dictionary
             self.paraphrase.document().setPlainText("There is nothing to be processed.")
@@ -134,13 +166,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.hint.document().setPlainText("")
             self.freqBar.setMaximum(0)
             self.editor_block_signals(False)
+            self.set_gui_enabled(False)
 
         self.update_progress_bar()
-        self.entryList.blockSignals(False)
 
     def confirm_before_action(self, action_name):
         if self.has_changed:
-            quit_msg = "Are you sure you want to %s? Unsaved edit will be lost." % action_name
+            quit_msg = "Are you sure you want to %s? Unsaved entries will be lost." % action_name
             reply = QtWidgets.QMessageBox.question(self, 'Message',
                                                    quit_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
             return reply == QtWidgets.QMessageBox.Yes
@@ -204,7 +236,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discardBar.setMaximum(record_count)
         self.discardBar.setValue(self.discard_count)
 
-    def load_entry(self, idx):
+    def editor_load_entry(self, idx):
 
         if idx < 0 or idx >= len(self.records):
             return
@@ -212,13 +244,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         r = self.records[idx]
 
         if not self.is_saving:
-            self.load_collins(r["subject"])
-            if r["status"] == RecordStatus.UNVIEWED:
-                self.pronSamantha.click()  # including toggling and first-time pronouncing
-                self.set_record_status(idx, RecordStatus.TOPROCESS)
-            if r["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time and got nothing
-                self.freqBar.setMaximum(0)
-                # Later freqBar and cardType will be updated by set_word_freq() slot
+            if r["subject"] != "":
+                self.load_collins(r["subject"])
+                if r["status"] == RecordStatus.UNVIEWED:
+                    self.pronSamantha.click()  # including toggling and first-time pronouncing
+                    self.set_record_status(idx, RecordStatus.TOPROCESS)
+                if r["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time and got nothing
+                    self.freqBar.setMaximum(0)
+                    # Later freqBar and cardType will be updated by set_word_freq() slot
+            else:
+                self.freqBar.setMaximum(5)  # recover maximum
 
         self.editor_block_signals(True)
 
@@ -248,9 +283,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.editor_block_signals(False)
 
     def move_to_next(self):
-        if self.cur_idx() < len(self.entries) - 1:
+        if self.cur_idx() < len(self.records) - 1:
             self.entryList.setCurrentRow(self.cur_idx() + 1)
             # Loading data will be completed by selected_changed()
+        elif self.cur_idx() == len(self.records) - 1:
+            self.add_new_entry_click()
 
     def next_click(self):
         self.set_record_status(self.cur_idx(), RecordStatus.CONFIRMED)
@@ -261,7 +298,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.move_to_next()
 
     def selected_changed(self):
-        self.load_entry(self.cur_idx())
+        self.editor_load_entry(self.cur_idx())
 
     def pron_clicked(self):
         sender = self.sender()
@@ -275,9 +312,18 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def subject_changed(self):
         subject = self.subject.toPlainText()
         self.cur_record()["subject"] = subject
-        self.cur_record()["freq"] = 0
+        # self.cur_record()["freq"] = 0
         self.entryList.item(self.cur_idx()).setText(subject)
-        self.load_entry(self.cur_idx())
+        # self.editor_load_entry(self.cur_idx())
+
+    def eventFilter(self, widget, event):
+        if event.type() == QtCore.QEvent.KeyPress and widget is self.subject:
+            key = event.key()
+            if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
+                self.cur_record()["freq"] = 0
+                self.editor_load_entry(self.cur_idx())
+                return True
+        return QtWidgets.QWidget.eventFilter(self, widget, event)
 
     def paraphrase_changed(self):
         self.cur_record()["para"] = self.paraphrase.toPlainText()
@@ -385,8 +431,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                      r["freq"])
 
             # Write back to DB
-            if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
-                self.db.set_word_mature(self.entries[i][0], 100)
+            if r["word_id"] is not None:
+                if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
+                    self.db.set_word_mature(r["word_id"], 100)
 
         self.importer_r.close_file()
         self.importer_rd.close_file()
@@ -424,9 +471,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.cur_record()["img"] = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
-    def reload_click(self):
+    def reload_kindle_click(self):
         if self.confirm_before_action("reload database"):
-            self.reload_data()
+            self.reload_kindle_data()
 
     def freq_bar_double_click(self, event):
         self.load_collins(self.cur_record()["subject"])  # reload website
@@ -458,9 +505,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @pyqtSlot(bool)
     def web_load_finished(self, ok):
-        if ok:
-            self.webView.loadFinished.disconnect()
-            self.webView.page().toHtml(self.web_to_html_callback)
+        # if ok:
+        self.webView.loadFinished.disconnect()
+        self.webView.page().toHtml(self.web_to_html_callback)
         # TODO: handle the case of failure
 
     def web_to_html_callback(self, html):
@@ -483,6 +530,31 @@ $('.mpuslot_b-container').remove()
 """
         self.webView.page().runJavaScript(js)
 
+    def add_new_entry_click(self):
+        self.records.append({
+            "status": RecordStatus.UNVIEWED,
+            "word_id": None,
+            "subject": "",
+            "pron": "Unknown",
+            "para": "",
+            "ext": "",
+            "usage": "",
+            "source": "",
+            "hint": "",
+            "img": None,  # no image
+            "freq": 0,
+            "card": 0,
+            "tips": ""
+        })
+        self.entryList.addItem("")  # signals has been blocked
+        self.entryList.setCurrentRow(len(self.records) - 1)  # will trigger editor_load_entry()
+        self.update_ui_after_entry_count_changed()
+        self.subject.setFocus()
+
+    def clear_list_click(self):
+        if self.confirm_before_action("clear list manually"):
+            self.clear_records()
+
 
 if __name__ == '__main__':
 
@@ -490,15 +562,7 @@ if __name__ == '__main__':
     script_dir = os.path.dirname(os.path.realpath(__file__))
     app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
 
-    if os.path.isfile(db_file_):
-        mapleUtility = MapleUtility(app, db_file_, output_path_)
-        mapleUtility.showMaximized()
-    else:
-        msg_box = QtWidgets.QMessageBox()
-        msg_box.setWindowTitle("Error")
-        msg_box.setText("Failed to find Kindle DB file. Please make sure Kindle has connected.")
-        msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-        msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
-        msg_box.show()
+    mapleUtility = MapleUtility(app, db_file_, output_path_)
+    mapleUtility.showMaximized()
 
     sys.exit(app.exec_())

@@ -18,7 +18,7 @@
     <rect>
      <x>20</x>
      <y>22</y>
-     <width>1317</width>
+     <width>1305</width>
      <height>846</height>
     </rect>
    </property>
@@ -58,10 +58,56 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="reloadDB">
-         <property name="text">
-          <string>Reload Database</string>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>3</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_2">
+         <property name="title">
+          <string>Load Data</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_4">
+          <item>
+           <widget class="QPushButton" name="loadKindle">
+            <property name="text">
+             <string>Kindle Database</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="loadCSV">
+            <property name="text">
+             <string>CSV List</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="newEntry">
+            <property name="text">
+             <string>New Single Entry</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="clearList">
+            <property name="text">
+             <string>Clear List</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </item>
        <item>
