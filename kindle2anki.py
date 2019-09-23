@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 from datetime import datetime
 from enum import Enum
 from maple_utility import *
 from anki_interface import *
-from kindle_db import *
+from data_io import *
 import web_interface
 import urllib.parse
 
@@ -65,9 +65,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.imageLabel.mousePressEvent = self.image_click
         self.imageLabel.mouseDoubleClickEvent = self.image_double_click
         self.loadKindle.clicked.connect(self.reload_kindle_click)
+        self.loadCSV.clicked.connect(self.reload_csv_click)
         self.newEntry.clicked.connect(self.add_new_entry_click)
         self.clearList.clicked.connect(self.clear_list_click)
         self.saveBar.setVisible(False)
+        self.cardType.currentIndexChanged.connect(self.card_type_changed)
 
         # Setup threads and timers
 
@@ -106,41 +108,52 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     def reload_kindle_data(self):
 
-        if self.db is None:
-            if os.path.isfile(self.db_file):
-                self.db = KindleDB(self.db_file)
-            else:
-                msg_box = QtWidgets.QMessageBox()
-                msg_box.setWindowTitle("Error")
-                msg_box.setText("Failed to find Kindle DB file. Please make sure Kindle has connected.")
-                msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-                msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
-                msg_box.exec_()
-                return
+        if os.path.isfile(self.db_file):
+            if self.db is not None:
+                del self.db
+                self.db = None
+            self.db = KindleDB(self.db_file)
+            self.reload_db()
+        else:
+            msg_box = QtWidgets.QMessageBox()
+            msg_box.setWindowTitle("Error")
+            msg_box.setText("Failed to find Kindle DB file. Please make sure Kindle has connected.")
+            msg_box.setIcon(QtWidgets.QMessageBox.Warning)
+            msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+            msg_box.exec_()
+            return
+
+    def reload_csv_data(self):
+
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        csv_file, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                  "CSV Files (*.csv);;All Files (*)", options=options)
+        if csv_file:
+            if self.db is not None:
+                del self.db
+                self.db = None
+            self.db = CSVDB(csv_file)
+            self.reload_db()
+
+    def reload_db(self):
 
         self.clear_records()
 
+        self.records = self.db.fetch_all(new_only=True)
+
         self.entryList.blockSignals(True)
 
-        for (word_id, word, usage, title, authors, category) in self.db.fetch_all(new_only=True):
-            self.records.append({
-                "status": RecordStatus.UNVIEWED,
-                "word_id": word_id,
-                "subject": word,
-                "pron": "Unknown",
-                "para": "",
-                "ext": "",
-                "usage": usage,  # plain text, bold will be applied at editor_load_entry()
-                "source": '<div align="right" style="font-size:12px"><I>%s</I>, %s</div>' % (title, authors),
-                # read-only
-                "hint": "",
-                "img": None,  # no image
-                "freq": 0,
-                "card": 0,
-                "tips": ""
-            })
-
-            self.entryList.addItem(word)  # signals has been blocked
+        # Initialize additional fields and add to list
+        for r in self.records:
+            r["status"] = RecordStatus.UNVIEWED
+            r["pron"] = "Unknown"
+            r["para"] = r["ext"] = r["hint"] = ""
+            r["img"] = None  # no image
+            r["freq"] = 0
+            r["card"] = 0
+            r["tips"] = ""
+            self.entryList.addItem(r["subject"])  # signals has been blocked
 
         self.has_changed = False
 
@@ -245,13 +258,19 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         if not self.is_saving:
             if r["subject"] != "":
-                self.load_collins(r["subject"])
+
                 if r["status"] == RecordStatus.UNVIEWED:
                     self.pronSamantha.click()  # including toggling and first-time pronouncing
                     self.set_record_status(idx, RecordStatus.TOPROCESS)
-                if r["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time and got nothing
-                    self.freqBar.setMaximum(0)
-                    # Later freqBar and cardType will be updated by set_word_freq() slot
+
+                if self.autoQuery.isChecked():
+                    self.load_collins(r["subject"])
+                    if r["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time and got nothing
+                        self.freqBar.setMaximum(0)
+                        # Later freqBar and cardType will be updated by set_word_freq() slot
+                else:
+                    self.freqBar.setMaximum(5)  # recover maximum
+
             else:
                 self.freqBar.setMaximum(5)  # recover maximum
 
@@ -398,14 +417,18 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         save_file_rd = "%s/kindle-rd-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
         self.importer_r.open_file(save_file_r)
         self.importer_rd.open_file(save_file_rd)
-        for i in range(len(self.records)):
+
+        record_count = len(self.records)
+        for i in range(record_count):
 
             r = self.records[i]
 
             # Set UI
-            self.saveBar.setValue(i)
-            self.entryList.setCurrentRow(i)
-            QtCore.QCoreApplication.processEvents()
+            if record_count < 150 or i % (int(record_count / 100)) == 0:
+                # Disable parts of animation to accelerate saving process
+                self.saveBar.setValue(i)
+                self.entryList.setCurrentRow(i)
+                QtCore.QCoreApplication.processEvents()
 
             # Generate data
             if r["status"] == RecordStatus.CONFIRMED:
@@ -434,11 +457,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             if r["word_id"] is not None:
                 if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
                     self.db.set_word_mature(r["word_id"], 100)
+        if self.db is not None:
+            self.db.commit_changes()
 
         self.importer_r.close_file()
         self.importer_rd.close_file()
 
         self.set_gui_enabled(True)
+        self.entryList.blockSignals(False)
         self.editor_block_signals(False)
         self.saveBar.setVisible(False)
         self.saveBar.setValue(len(self.records))
@@ -474,6 +500,10 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def reload_kindle_click(self):
         if self.confirm_before_action("reload database"):
             self.reload_kindle_data()
+
+    def reload_csv_click(self):
+        if self.confirm_before_action("reload database"):
+            self.reload_csv_data()
 
     def freq_bar_double_click(self, event):
         self.load_collins(self.cur_record()["subject"])  # reload website
@@ -554,6 +584,12 @@ $('.mpuslot_b-container').remove()
     def clear_list_click(self):
         if self.confirm_before_action("clear list manually"):
             self.clear_records()
+
+    def card_type_changed(self):
+        self.cur_record()["card"] = self.cardType.currentIndex()
+
+    def __del__(self):
+        del self.db
 
 
 if __name__ == '__main__':

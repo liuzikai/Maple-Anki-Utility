@@ -19,7 +19,7 @@
      <x>20</x>
      <y>22</y>
      <width>1305</width>
-     <height>846</height>
+     <height>840</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -364,26 +364,54 @@ QProgressBar::chunk {
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="cardType">
-            <property name="maximumSize">
-             <size>
-              <width>75</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="currentText">
-             <string>R</string>
-            </property>
-            <item>
-             <property name="text">
-              <string>R</string>
+           <widget class="QWidget" name="widget_6" native="true">
+            <layout class="QVBoxLayout" name="verticalLayout_5">
+             <property name="leftMargin">
+              <number>0</number>
              </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>RD</string>
+             <property name="topMargin">
+              <number>0</number>
              </property>
-            </item>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QComboBox" name="cardType">
+               <property name="maximumSize">
+                <size>
+                 <width>75</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="currentText">
+                <string>R</string>
+               </property>
+               <item>
+                <property name="text">
+                 <string>R</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>RD</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="autoQuery">
+               <property name="text">
+                <string>Auto Query</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
          </layout>
