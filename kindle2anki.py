@@ -7,8 +7,8 @@ from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 from datetime import datetime
 from enum import Enum
 from maple_utility import *
-from anki_interface import *
-from data_io import *
+from anki_output import *
+from data_input import *
 import web_interface
 import urllib.parse
 
