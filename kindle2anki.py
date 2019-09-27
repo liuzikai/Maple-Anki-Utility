@@ -157,14 +157,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.has_changed = False
 
+        self.entryList.blockSignals(False)
+
+        self.update_ui_after_entry_count_changed()  # need to before loading first entry to make gui enabled
+
         # Setup initial entry, must be after necessary initialization
         if len(self.records) > 0:
-            self.entryList.setCurrentRow(0)  # signal of entryList has been block, will not trigger editor_load_entry()
-            self.editor_load_entry(self.cur_idx())
-
-        self.update_ui_after_entry_count_changed()
-
-        self.entryList.blockSignals(False)
+            self.entryList.setCurrentRow(0)  # will trigger editor_load_entry()
 
     def update_ui_after_entry_count_changed(self):
         if len(self.records) > 0:
@@ -244,10 +243,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         record_count = len(self.records)
         self.unreadBar.setMaximum(record_count)
         self.unreadBar.setValue(record_count - (self.confirmed_count + self.discard_count))
+        self.unreadBar.setToolTip("%d unread" % self.unreadBar.value())
         self.confirmedBar.setMaximum(record_count)
         self.confirmedBar.setValue(self.confirmed_count)
+        self.confirmedBar.setToolTip("%d confirmed" % self.confirmedBar.value())
         self.discardBar.setMaximum(record_count)
         self.discardBar.setValue(self.discard_count)
+        self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
 
     def editor_load_entry(self, idx):
 
@@ -526,6 +528,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def load_collins(self, word):
         self.webView.loadFinished.connect(self.web_load_finished)
         self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
         self.webView.load(QtCore.QUrl(web_interface.collins_url + urllib.parse.quote(word)))
         # Wait for slot web_load_finished
 
