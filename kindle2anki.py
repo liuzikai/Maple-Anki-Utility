@@ -426,7 +426,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             r = self.records[i]
 
             # Set UI
-            if record_count < 150 or i % (int(record_count / 100)) == 0:
+            if record_count < 150 or i % (int(record_count / 100)) == 0 \
+                    or r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
                 # Disable parts of animation to accelerate saving process
                 self.saveBar.setValue(i)
                 self.entryList.setCurrentRow(i)
@@ -560,6 +561,8 @@ $('.res_cell_right').remove()
 $('.btmslot_a-container').remove()
 $('.exercise').remove()
 $('.mpuslot_b-container').remove()
+$('._hj-f5b2a1eb-9b07_feedback_minimized_label').remove()
+$('.share-button').remove()
 """
         self.webView.page().runJavaScript(js)
 
