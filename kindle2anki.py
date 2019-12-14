@@ -61,7 +61,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discard_shortcut.activated.connect(self.discard_click)
         self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
         self.new_entry_shortcut.activated.connect(self.add_new_entry_click)
-        # TODO: handle event using fliter
+        # TODO: handle event using filter
         self.imageLabel.mousePressEvent = self.image_click
         self.imageLabel.mouseDoubleClickEvent = self.image_double_click
         self.loadKindle.clicked.connect(self.reload_kindle_click)
@@ -70,6 +70,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.clearList.clicked.connect(self.clear_list_click)
         self.saveBar.setVisible(False)
         self.cardType.currentIndexChanged.connect(self.card_type_changed)
+        self.webView.loadFinished.connect(self.web_load_finished)
 
         # Setup threads and timers
 
@@ -527,7 +528,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.cardType.setCurrentIndex(self.records[idx]["card"])
 
     def load_collins(self, word):
-        self.webView.loadFinished.connect(self.web_load_finished)
+
         self.webView.page().profile().setHttpUserAgent(mac_user_agent)
         self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
         self.webView.load(QtCore.QUrl(web_interface.collins_url + urllib.parse.quote(word)))
@@ -540,14 +541,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @pyqtSlot(bool)
     def web_load_finished(self, ok):
         # if ok:
-        self.webView.loadFinished.disconnect()
-        self.webView.page().toHtml(self.web_to_html_callback)
+        # self.webView.loadFinished.disconnect()
+        self.webView.page().runJavaScript("document.documentElement.outerHTML", self.web_to_html_callback)
         # TODO: handle the case of failure
 
-    def web_to_html_callback(self, html):
+    def web_to_html_callback(self, html_str):
 
         if self.cur_record()["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time
-            (freq, tips) = web_interface.parse_collins_word_frequency(html)
+            (freq, tips) = web_interface.parse_collins_word_frequency(html_str)
             self.set_word_freq(self.cur_idx(), freq, tips)
 
         js = """
