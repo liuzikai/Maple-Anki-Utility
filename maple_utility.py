@@ -11,9 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MapleUtility(object):
     def setupUi(self, MapleUtility):
         MapleUtility.setObjectName("MapleUtility")
-        MapleUtility.resize(1403, 730)
+        MapleUtility.resize(1421, 888)
         self.mainWidget = QtWidgets.QWidget(MapleUtility)
-        self.mainWidget.setGeometry(QtCore.QRect(20, 22, 1305, 840))
+        self.mainWidget.setGeometry(QtCore.QRect(20, 22, 1303, 848))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -290,16 +290,38 @@ class Ui_MapleUtility(object):
         self.discardButton = QtWidgets.QPushButton(self.widget)
         self.discardButton.setObjectName("discardButton")
         self.horizontalLayout_2.addWidget(self.discardButton)
-        self.nextButton = QtWidgets.QPushButton(self.widget)
-        self.nextButton.setAcceptDrops(True)
-        self.nextButton.setObjectName("nextButton")
-        self.horizontalLayout_2.addWidget(self.nextButton)
+        self.confirmButton = QtWidgets.QPushButton(self.widget)
+        self.confirmButton.setAcceptDrops(True)
+        self.confirmButton.setObjectName("confirmButton")
+        self.horizontalLayout_2.addWidget(self.confirmButton)
         self.verticalLayout_3.addWidget(self.widget)
         self.horizontalLayout_3.addWidget(self.editWidget)
         self.widget_5 = QtWidgets.QWidget(self.mainWidget)
         self.widget_5.setObjectName("widget_5")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.widget_5)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.groupBox_3 = QtWidgets.QGroupBox(self.widget_5)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.groupBox_3.sizePolicy().hasHeightForWidth())
+        self.groupBox_3.setSizePolicy(sizePolicy)
+        self.groupBox_3.setObjectName("groupBox_3")
+        self.horizontalLayout_7 = QtWidgets.QHBoxLayout(self.groupBox_3)
+        self.horizontalLayout_7.setObjectName("horizontalLayout_7")
+        self.pushButton_2 = QtWidgets.QPushButton(self.groupBox_3)
+        self.pushButton_2.setObjectName("pushButton_2")
+        self.horizontalLayout_7.addWidget(self.pushButton_2)
+        self.queryGoogleImage = QtWidgets.QPushButton(self.groupBox_3)
+        self.queryGoogleImage.setObjectName("queryGoogleImage")
+        self.horizontalLayout_7.addWidget(self.queryGoogleImage)
+        self.queryGoogleTranslate = QtWidgets.QPushButton(self.groupBox_3)
+        self.queryGoogleTranslate.setObjectName("queryGoogleTranslate")
+        self.horizontalLayout_7.addWidget(self.queryGoogleTranslate)
+        self.queryGoogle = QtWidgets.QPushButton(self.groupBox_3)
+        self.queryGoogle.setObjectName("queryGoogle")
+        self.horizontalLayout_7.addWidget(self.queryGoogle)
+        self.verticalLayout_2.addWidget(self.groupBox_3)
         self.webView = QtWebEngineWidgets.QWebEngineView(self.widget_5)
         self.webView.setMinimumSize(QtCore.QSize(600, 0))
         self.webView.setMaximumSize(QtCore.QSize(600, 16777215))
@@ -337,8 +359,8 @@ class Ui_MapleUtility(object):
         self.paraphrase.setHtml(_translate("MapleUtility", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:20pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Paraphrase</p></body></html>"))
+"</style></head><body style=\" font-family:\'.AppleSystemUIFont\'; font-size:20pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:\'.SF NS Text\';\">Paraphrase</span></p></body></html>"))
         self.imageLabel.setToolTip(_translate("MapleUtility", "Right click to search image on Google Image"))
         self.imageLabel.setText(_translate("MapleUtility", "Image"))
         self.label_4.setText(_translate("MapleUtility", "Extension"))
@@ -348,17 +370,22 @@ class Ui_MapleUtility(object):
         self.example.setHtml(_translate("MapleUtility", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:16pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>"))
+"</style></head><body style=\" font-family:\'.AppleSystemUIFont\'; font-size:16pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:\'.SF NS Text\';\"><br /></p></body></html>"))
         self.source.setHtml(_translate("MapleUtility", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'.SF NS Text\'; font-size:13pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:12pt;\">Source</span></p></body></html>"))
+"</style></head><body style=\" font-family:\'.AppleSystemUIFont\'; font-size:13pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:\'.SF NS Text\'; font-size:12pt;\">Source</span></p></body></html>"))
         self.label_6.setText(_translate("MapleUtility", "Hint"))
         self.hint.setPlainText(_translate("MapleUtility", "Hint"))
         self.saveAllButton.setText(_translate("MapleUtility", "Save All"))
         self.discardButton.setText(_translate("MapleUtility", "Discard"))
-        self.nextButton.setText(_translate("MapleUtility", "Confirm"))
+        self.confirmButton.setText(_translate("MapleUtility", "Confirm"))
+        self.groupBox_3.setTitle(_translate("MapleUtility", "Web Query"))
+        self.pushButton_2.setText(_translate("MapleUtility", "Collins"))
+        self.queryGoogleImage.setText(_translate("MapleUtility", "Google Image"))
+        self.queryGoogleTranslate.setText(_translate("MapleUtility", "Google Translate"))
+        self.queryGoogle.setText(_translate("MapleUtility", "Google"))
 
 from PyQt5 import QtWebEngineWidgets
