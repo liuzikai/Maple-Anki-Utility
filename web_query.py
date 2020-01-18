@@ -9,16 +9,28 @@ from PyQt5.QtCore import QUrl, QEventLoop
 from PyQt5 import QtWebEngineWidgets
 import urllib.parse
 
-collins_url = u"https://www.collinsdictionary.com/dictionary/english/"
 
+mac_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8"
+ios_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 
-def query_collins_word_frequency(word):
-    try:
-        url = collins_url + urllib.parse.quote(word)
-        headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"}
-        return parse_collins_word_frequency(requests.get(url, headers=headers).text.encode('utf-8'))
-    except Exception as err:
-        return 0, str(err)
+# -------------------------------- Collins --------------------------------
+
+collins_url = u"https://www.collinsdictionary.com/dictionary/english/%s"
+
+collins_post_js = """
+$('iframe').remove()
+$('.topslot_container').remove()
+$('.cB-hook').remove()
+$('#videos').remove()
+$('.socialButtons').remove()
+$('.tabsNavigation').remove()
+$('.res_cell_right').remove()
+$('.btmslot_a-container').remove()
+$('.exercise').remove()
+$('.mpuslot_b-container').remove()
+$('._hj-f5b2a1eb-9b07_feedback_minimized_label').remove()
+$('.share-button').remove()
+"""
 
 
 def parse_collins_word_frequency(html):
@@ -35,73 +47,19 @@ def parse_collins_word_frequency(html):
         return 0, str(err)
 
 
-def open_collins_website(word):
-    webbrowser.open(collins_url + urllib.parse.quote(word))
+# -------------------------------- Google Images --------------------------------
 
-
-class CollinsWorker(QThread):
-
-    finished = pyqtSignal(int, int, str)
-
-    toHtmlFinished = pyqtSignal()
-
-    def __init__(self, web_view):
-        QThread.__init__(self)
-
-        self.web_view = web_view
-
-        self.idx = None
-        self.word = None
-        self.html = ""
-
-    def __del__(self):
-        self.wait()
-
-    def query(self, idx, word):
-        self.idx = idx
-        self.word = word
-        self.start()
-
-    def run(self):
-        (freq, tips) = query_collins_word_frequency(self.word)
-        self.finished.emit(self.idx, freq, tips)
-
-
-google_image_url = u"https://www.google.com/search?tbm=isch&q="
+google_image_url = u"https://www.google.com/search?tbm=isch&q=%s"
 
 
 def open_google_image_website(word):
     webbrowser.open(google_image_url + urllib.parse.quote(word))
 
 
-mac_dict_url = u"dict://"
+# -------------------------------- Google Translate --------------------------------
 
+google_translate_url = u"https://translate.google.com/?sl=en&tl=zh-CN&text=%s"
 
-def open_mac_dict(word):
-    webbrowser.open(mac_dict_url + urllib.parse.quote(word), autoraise=False)
+# -------------------------------- Google --------------------------------
 
-
-class MacDictWorker(QThread):
-
-    finished = pyqtSignal(str)
-
-    def __init__(self):
-        QThread.__init__(self)
-        self.word = None
-
-    def __del__(self):
-        self.wait()
-
-    def search(self, word):
-        self.word = word
-        self.start()
-
-    def run(self):
-        open_collins_website(self.word)
-        self.finished.emit(self.word)
-
-
-if __name__ == '__main__':
-    word = input("Please input a word: ")
-    (freq, tips) = query_collins_word_frequency(word)
-    print("Word frequency of %s is %d (%s)" % (word, freq, tips))
+google_url = u"https://www.google.com/search?q=%s"

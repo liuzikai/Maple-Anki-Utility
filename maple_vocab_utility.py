@@ -6,20 +6,18 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 from datetime import datetime
 from enum import Enum
+import urllib.parse
+
 from maple_utility import *
 from data_export import *
 from data_source import *
-import web_query
-import urllib.parse
+from web_query import *
 
 
 # db_file_ = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab.db"
 db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
-
-mac_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8"
-ios_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 
 
 class RecordStatus(Enum):
@@ -69,16 +67,23 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.clearList.clicked.connect(self.clear_list_clicked)
         self.saveBar.setVisible(False)
         self.cardType.currentIndexChanged.connect(self.card_type_changed)
+        self.webView.loadStarted.connect(self.web_load_started)
+        self.webView.loadProgress.connect(self.web_load_progress)
         self.webView.loadFinished.connect(self.web_load_finished)
+        self.queryCollins.clicked.connect(self.query_collins_clicked)
+        self.queryGoogleImage.clicked.connect(self.query_google_images_clicked)
+        self.queryGoogleTranslate.clicked.connect(self.query_google_translate_clicked)
+        self.queryGoogle.clicked.connect(self.query_google_clicked)
         self.editor_components = [self.subject, self.pronSamantha, self.pronDaniel, self.paraphrase, self.imageLabel,
-                                  self.extension, self.example, self.source, self.hint, self.cardType]
+                                  self.extension, self.example, self.source, self.hint, self.cardType,
+                                  self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
 
         # Setup threads and timers
 
-        self.web_worker = web_query.CollinsWorker(self.webView)
-        self.web_worker.finished.connect(self.set_word_freq)
-        self.mac_dict_worker = web_query.MacDictWorker()
-        self.mac_dict_worker.finished.connect(self.after_opening_mac_dict)
+        # self.web_worker = web_query.CollinsWorker(self.webView)
+        # self.web_worker.finished.connect(self.set_word_freq)
+        # self.mac_dict_worker = web_query.MacDictWorker()
+        # self.mac_dict_worker.finished.connect(self.after_opening_mac_dict)
 
         # Setup data
 
@@ -89,6 +94,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # self.importer_rd = AnkiImporter()
         self.is_saving = False
         self.has_changed = False
+        self.loading_collins = False
 
         self.records = []
         self.discard_count = 0
@@ -196,6 +202,98 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if len(self.records) > 0:
             self.entryList.setCurrentRow(0)  # will trigger editor_load_entry()
 
+    def save_all(self):
+        """
+        Helper function to save all records
+        :return: None
+        """
+
+        self.set_gui_enabled(False)  # ---------------- GUI disabled ---------------->
+        self.editor_block_signals(True)  # ---------------- editor signals blocked ---------------->
+        self.saveBar.setVisible(True)
+        self.saveBar.setMaximum(len(self.records))
+
+        self.is_saving = True
+
+        save_files = {}
+        exporters = {}
+
+        record_count = len(self.records)
+        for i in range(record_count):
+
+            r = self.records[i]
+
+            # Set UI
+            if record_count < 150 or i % (int(record_count / 100)) == 0 \
+                    or r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
+                # Only show parts of animation to accelerate saving process
+                self.saveBar.setValue(i)
+                self.entryList.setCurrentRow(i)
+                QtCore.QCoreApplication.processEvents()
+
+            # Generate data
+            if r["status"] == RecordStatus.CONFIRMED:
+
+                # Select proper exporter
+                card_ = r["card"]
+                if card_ not in exporters.keys():  # it's the first time we encounter this type of card
+                    save_files[card_] = "%s/maple-%s-%s.txt" % \
+                                        (self.output_path, card_, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+                    exporters[card_] = DataExporter()
+                    exporters[card_].open_file(save_files[card_])
+
+                exporter = exporters[card_]
+
+                example = '%s<br>%s' % (r["usage"], r["source"])
+                mp3 = exporter.generate_media(r["subject"], r["pron"])
+                if r["img"]:
+                    img_file = exporter.new_random_filename("png")
+                    r["img"].save("%s/%s" % (exporter.media_path, img_file))
+                    r["para"] += '<div><br><img src="%s"><br></div>' % img_file
+                exporter.write_entry(r["subject"],
+                                     "[sound:%s]" % mp3,
+                                     r["para"],
+                                     r["ext"],
+                                     example,
+                                     r["hint"],
+                                     r["freq"])
+
+            # Write back to DB
+            if r["word_id"] is not None:
+                if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
+                    self.db.set_word_mature(r["word_id"], 100)
+
+        if self.db is not None:
+            self.db.commit_changes()
+
+        for exporter in exporters.values():
+            exporter.close_file()
+
+        self.entryList.setCurrentRow(record_count - 1)  # set selection to last
+        self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
+        self.editor_block_signals(False)  # <---------------- editor signals unblocked ----------------
+        self.saveBar.setVisible(False)
+        self.saveBar.setValue(len(self.records))
+
+        self.is_saving = False
+        self.has_changed = False
+
+        return "\n" + "\n".join(save_files.values())
+
+    def cur_idx(self):
+        """
+        Helper function to get current index.
+        :return: current index
+        """
+        return self.entryList.currentRow()
+
+    def cur_record(self):
+        """
+        Helper function to get current record entry.
+        :return: current record
+        """
+        return self.records[self.cur_idx()]
+
     # -------------------------------- UI Helper Functions --------------------------------
 
     def update_ui_after_record_count_changed(self):
@@ -233,20 +331,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             return reply == QtWidgets.QMessageBox.Yes
         else:
             return True
-
-    def cur_idx(self):
-        """
-        Helper function to get current index.
-        :return: current index
-        """
-        return self.entryList.currentRow()
-
-    def cur_record(self):
-        """
-        Helper function to get current record entry.
-        :return: current record
-        """
-        return self.records[self.cur_idx()]
 
     def set_record_status(self, idx, status):
         """
@@ -329,7 +413,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                     self.set_record_status(idx, RecordStatus.TOPROCESS)
 
                 if self.autoQuery.isChecked():
-                    self.load_collins(r["subject"])
+                    self.web_query(collins_url, r["subject"])
                     if r["freq"] == 0:  # not only UNVIEWED, but also when failure occurred last time and got nothing
                         self.freqBar.setMaximum(0)  # change it to the loading style
                         # Later freqBar and cardType will be updated by set_word_freq() slot
@@ -422,10 +506,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # self.editor_load_entry(self.cur_idx())
 
     def eventFilter(self, widget, event):
+        """
+        Handler of various key events
+        :param widget:
+        :param event:
+        :return:
+        """
         if event.type() == QtCore.QEvent.KeyPress and widget is self.subject:
             key = event.key()
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
-                self.cur_record()["freq"] = 0
+                self.cur_record()["status"] = RecordStatus.UNVIEWED
                 self.editor_load_entry(self.cur_idx())
                 return True
         return QtWidgets.QWidget.eventFilter(self, widget, event)
@@ -464,84 +554,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                                   save_file),
                                               QtWidgets.QMessageBox.Ok)
 
-    def save_all(self):
-        """
-        Helper function to save all records
-        :return: None
-        """
-
-        self.set_gui_enabled(False)  # ---------------- GUI disabled ---------------->
-        self.editor_block_signals(True)  # ---------------- editor signals blocked ---------------->
-        self.saveBar.setVisible(True)
-        self.saveBar.setMaximum(len(self.records))
-
-        self.is_saving = True
-
-        save_files = {}
-        exporters = {}
-
-        record_count = len(self.records)
-        for i in range(record_count):
-
-            r = self.records[i]
-
-            # Set UI
-            if record_count < 150 or i % (int(record_count / 100)) == 0 \
-                    or r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
-                # Only show parts of animation to accelerate saving process
-                self.saveBar.setValue(i)
-                self.entryList.setCurrentRow(i)
-                QtCore.QCoreApplication.processEvents()
-
-            # Generate data
-            if r["status"] == RecordStatus.CONFIRMED:
-
-                # Select proper exporter
-                card_ = r["card"]
-                if card_ not in exporters.keys():  # it's the first time we encounter this type of card
-                    save_files[card_] = "%s/maple-%s-%s.txt" % \
-                                        (self.output_path, card_, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-                    exporters[card_] = DataExporter()
-                    exporters[card_].open_file(save_files[card_])
-
-                exporter = exporters[card_]
-
-                example = '%s<br>%s' % (r["usage"], r["source"])
-                mp3 = exporter.generate_media(r["subject"], r["pron"])
-                if r["img"]:
-                    img_file = exporter.new_random_filename("png")
-                    r["img"].save("%s/%s" % (exporter.media_path, img_file))
-                    r["para"] += '<div><br><img src="%s"><br></div>' % img_file
-                exporter.write_entry(r["subject"],
-                                     "[sound:%s]" % mp3,
-                                     r["para"],
-                                     r["ext"],
-                                     example,
-                                     r["hint"],
-                                     r["freq"])
-
-            # Write back to DB
-            if r["word_id"] is not None:
-                if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
-                    self.db.set_word_mature(r["word_id"], 100)
-
-        if self.db is not None:
-            self.db.commit_changes()
-
-        for exporter in exporters.values():
-            exporter.close_file()
-
-        self.entryList.setCurrentRow(record_count - 1)  # set selection to last
-        self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
-        self.editor_block_signals(False)  # <---------------- editor signals unblocked ----------------
-        self.saveBar.setVisible(False)
-        self.saveBar.setValue(len(self.records))
-
-        self.is_saving = False
-        self.has_changed = False
-
-        return "\n" + "\n".join(save_files.values())
-
     def closeEvent(self, event):
 
         if self.confirm_before_action("exit"):
@@ -560,7 +572,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         elif event.button() == QtCore.Qt.RightButton:
             # web_interface.open_google_image_website(self.cur_record()["subject"])
             self.webView.page().profile().setHttpUserAgent(mac_user_agent)
-            self.webView.load(QtCore.QUrl(web_query.google_image_url + urllib.parse.quote(self.cur_record()["subject"])))
+            self.webView.load(QtCore.QUrl(google_image_url % urllib.parse.quote(self.cur_record()["subject"])))
 
     def image_double_clicked(self, event):
         self.cur_record()["img"] = None
@@ -575,62 +587,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.reload_csv_data()
 
     def freq_bar_double_clicked(self, event):
-        self.load_collins(self.cur_record()["subject"])  # reload website
-
-    @pyqtSlot(int, int, str)
-    def set_word_freq(self, idx, freq, tips):
-        self.records[idx]["freq"] = freq
-        if freq >= card_rd_threshold_:
-            self.records[idx]["card"] = "RD"
-        else:
-            self.records[idx]["card"] = "R"
-        self.records[idx]["tips"] = tips
-
-        if idx == self.cur_idx():
-            self.freqBar.setMaximum(5)
-            self.freqBar.setValue(freq)
-            self.freqBar.setToolTip(tips)
-            self.cardType.setCurrentIndex(self.cardType.findText(self.records[idx]["card"]))
-
-    def load_collins(self, word):
-
-        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
-        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
-        self.webView.load(QtCore.QUrl(web_query.collins_url + urllib.parse.quote(word)))
-        # Wait for slot web_load_finished
-
-    @pyqtSlot(str)
-    def after_opening_mac_dict(self, word):
-        self.raise_()
-
-    @pyqtSlot(bool)
-    def web_load_finished(self, ok):
-        # if ok:
-        # self.webView.loadFinished.disconnect()
-        self.webView.page().runJavaScript("document.documentElement.outerHTML", self.web_to_html_callback)
-        # TODO: handle the case of failure
-
-    def web_to_html_callback(self, html_str):
-
-        if self.cur_record()["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time
-            (freq, tips) = web_query.parse_collins_word_frequency(html_str)
-            self.set_word_freq(self.cur_idx(), freq, tips)
-
-        js = """
-$('iframe').remove()
-$('.topslot_container').remove()
-$('.cB-hook').remove()
-$('#videos').remove()
-$('.socialButtons').remove()
-$('.tabsNavigation').remove()
-$('.res_cell_right').remove()
-$('.btmslot_a-container').remove()
-$('.exercise').remove()
-$('.mpuslot_b-container').remove()
-$('._hj-f5b2a1eb-9b07_feedback_minimized_label').remove()
-$('.share-button').remove()
-"""
-        self.webView.page().runJavaScript(js)
+        self.web_query(collins_url, self.cur_record()["subject"])  # reload website
 
     def add_new_entry_clicked(self):
         self.records.append({
@@ -659,6 +616,68 @@ $('.share-button').remove()
 
     def card_type_changed(self):
         self.cur_record()["card"] = self.cardType.currentText()
+
+    def query_collins_clicked(self):
+        self.web_query(collins_url, self.cur_record()["subject"])
+
+    def query_google_images_clicked(self):
+        self.web_query(google_image_url, self.cur_record()["subject"])
+
+    def query_google_translate_clicked(self):
+        self.web_query(google_translate_url, self.cur_record()["subject"])
+
+    def query_google_clicked(self):
+        self.web_query(google_url, self.cur_record()["subject"])
+
+    # -------------------------------- Query Handlers --------------------------------
+
+    def web_query(self, base_url, word):
+        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
+        self.loading_collins = (base_url == collins_url)
+        self.webView.load(QtCore.QUrl(base_url % urllib.parse.quote(word)))
+        # Further handling will be completed by slots
+
+    @pyqtSlot()
+    def web_load_started(self):
+        self.freqBar.setMaximum(100)
+        self.freqBar.setValue(0)
+        self.freqBar.setTextVisible(False)
+
+    @pyqtSlot(int)
+    def web_load_progress(self, progress):
+        self.freqBar.setValue(progress)
+
+    @pyqtSlot(bool)
+    def web_load_finished(self, ok):
+        self.freqBar.setMaximum(5)  # recover maximum
+        self.freqBar.setValue(self.cur_record()["freq"])
+        self.freqBar.setTextVisible(True)
+        if self.loading_collins:
+            self.webView.page().runJavaScript("document.documentElement.outerHTML", self.collins_web_to_html_callback)
+
+    def collins_web_to_html_callback(self, html_str):
+
+        if self.cur_record()["freq"] == 0:  # not only UNVIEWED, but also retry if failure occurred last time
+            (freq, tips) = parse_collins_word_frequency(html_str)
+            self.set_word_freq(self.cur_idx(), freq, tips)
+
+        js = collins_post_js
+        self.webView.page().runJavaScript(js)  # run post js to eliminate ADs, etc.
+
+    def set_word_freq(self, idx, freq, tips):
+        self.records[idx]["freq"] = freq
+        if freq >= card_rd_threshold_:
+            self.records[idx]["card"] = "RD"
+        else:
+            self.records[idx]["card"] = "R"
+        self.records[idx]["tips"] = tips
+
+        if idx == self.cur_idx():
+            self.freqBar.setMaximum(5)
+            self.freqBar.setValue(freq)
+            self.freqBar.setToolTip(tips)
+            self.cardType.setCurrentIndex(self.cardType.findText(self.records[idx]["card"]))
 
 
 if __name__ == '__main__':
