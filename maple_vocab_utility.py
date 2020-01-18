@@ -3,7 +3,7 @@
 
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QTimer
 from datetime import datetime
 from enum import Enum
 import urllib.parse
@@ -18,6 +18,7 @@ from web_query import *
 db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
+auto_query_delay_ = 2000  # [ms]
 
 
 class RecordStatus(Enum):
@@ -80,10 +81,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         # Setup threads and timers
 
-        # self.web_worker = web_query.CollinsWorker(self.webView)
-        # self.web_worker.finished.connect(self.set_word_freq)
-        # self.mac_dict_worker = web_query.MacDictWorker()
-        # self.mac_dict_worker.finished.connect(self.after_opening_mac_dict)
+        self.auto_query_timer = QTimer()
+        self.auto_query_timer.setSingleShot(True)
+        self.auto_query_timer.timeout.connect(self.auto_query_timeout)
 
         # Setup data
 
@@ -188,7 +188,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             r["para"] = r["ext"] = r["hint"] = ""
             r["img"] = None  # no image
             r["freq"] = 0
-            r["card"] = ""
+            r["card"] = "R"
             r["tips"] = ""
             self.entryList.addItem(r["subject"])  # signals has been blocked
 
@@ -413,15 +413,19 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                     self.set_record_status(idx, RecordStatus.TOPROCESS)
 
                 if self.autoQuery.isChecked():
-                    self.web_query(collins_url, r["subject"])
+                    self.auto_query_timer.start(auto_query_delay_)
+                    # Later query will be handled by timer signal
                     if r["freq"] == 0:  # not only UNVIEWED, but also when failure occurred last time and got nothing
-                        self.freqBar.setMaximum(0)  # change it to the loading style
-                        # Later freqBar and cardType will be updated by set_word_freq() slot
+                        self.freqBar.setMaximum(5)
+                        self.freqBar.setValue(0)
+                        self.freqBar.setTextVisible(False)
                 else:
                     self.freqBar.setMaximum(5)  # recover maximum
+                    self.freqBar.setTextVisible(True)
 
             else:
                 self.freqBar.setMaximum(5)  # recover maximum
+                self.freqBar.setTextVisible(True)
 
         self.editor_block_signals(True)  # ---------------- main editor signals blocked ---------------->
 
@@ -481,23 +485,28 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     # -------------------------------- UI Signal Handlers --------------------------------
 
+    @pyqtSlot()
     def confirm_clicked(self):
         self.set_record_status(self.cur_idx(), RecordStatus.CONFIRMED)
         self.move_to_next()
 
+    @pyqtSlot()
     def discard_clicked(self):
         self.set_record_status(self.cur_idx(), RecordStatus.DISCARDED)
         self.move_to_next()
 
+    @pyqtSlot()
     def selected_changed(self):
         self.editor_load_entry(self.cur_idx())
 
+    @pyqtSlot()
     def pron_clicked(self):
         sender = self.sender()
         if sender:
             DataExporter.pronounce(self.cur_record()["subject"], sender.text())
             self.cur_record()["pron"] = sender.text()
 
+    @pyqtSlot()
     def subject_changed(self):
         subject = self.subject.toPlainText()
         self.cur_record()["subject"] = subject
@@ -520,18 +529,23 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 return True
         return QtWidgets.QWidget.eventFilter(self, widget, event)
 
+    @pyqtSlot()
     def paraphrase_changed(self):
         self.cur_record()["para"] = self.paraphrase.toPlainText()
 
+    @pyqtSlot()
     def extension_changed(self):
         self.cur_record()["ext"] = self.extension.toPlainText()
 
+    @pyqtSlot()
     def example_changed(self):
         self.cur_record()["usage"] = self.example.toPlainText()  # bold won't be saved as html
 
+    @pyqtSlot()
     def hint_changed(self):
         self.cur_record()["hint"] = self.hint.toPlainText()
 
+    @pyqtSlot()
     def save_all_clicked(self):
 
         confirm_str = "%d confirmed, %d discarded, %d unread.\n\n" \
@@ -555,12 +569,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                               QtWidgets.QMessageBox.Ok)
 
     def closeEvent(self, event):
-
         if self.confirm_before_action("exit"):
             event.accept()
         else:
             event.ignore()
 
+    @pyqtSlot()
     def image_clicked(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             mine_data = app.clipboard().mimeData()
@@ -574,21 +588,26 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.webView.page().profile().setHttpUserAgent(mac_user_agent)
             self.webView.load(QtCore.QUrl(google_image_url % urllib.parse.quote(self.cur_record()["subject"])))
 
+    @pyqtSlot()
     def image_double_clicked(self, event):
         self.cur_record()["img"] = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
+    @pyqtSlot()
     def load_kindle_clicked(self):
         if self.confirm_before_action("reload database"):
             self.reload_kindle_data()
 
+    @pyqtSlot()
     def load_csv_clicked(self):
         if self.confirm_before_action("reload database"):
             self.reload_csv_data()
 
+    @pyqtSlot()
     def freq_bar_double_clicked(self, event):
         self.web_query(collins_url, self.cur_record()["subject"])  # reload website
 
+    @pyqtSlot()
     def add_new_entry_clicked(self):
         self.records.append({
             "status": RecordStatus.UNVIEWED,
@@ -602,7 +621,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             "hint": "",
             "img": None,  # no image
             "freq": 0,
-            "card": "",
+            "card": "R",
             "tips": ""
         })
         self.entryList.addItem("")  # signals has been blocked
@@ -617,15 +636,19 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def card_type_changed(self):
         self.cur_record()["card"] = self.cardType.currentText()
 
+    @pyqtSlot()
     def query_collins_clicked(self):
         self.web_query(collins_url, self.cur_record()["subject"])
 
+    @pyqtSlot()
     def query_google_images_clicked(self):
         self.web_query(google_image_url, self.cur_record()["subject"])
 
+    @pyqtSlot()
     def query_google_translate_clicked(self):
         self.web_query(google_translate_url, self.cur_record()["subject"])
 
+    @pyqtSlot()
     def query_google_clicked(self):
         self.web_query(google_url, self.cur_record()["subject"])
 
@@ -678,6 +701,10 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.freqBar.setValue(freq)
             self.freqBar.setToolTip(tips)
             self.cardType.setCurrentIndex(self.cardType.findText(self.records[idx]["card"]))
+
+    @pyqtSlot()
+    def auto_query_timeout(self):
+        self.web_query(collins_url, self.cur_record()["subject"])
 
 
 if __name__ == '__main__':
