@@ -7,7 +7,7 @@ from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 from datetime import datetime
 from enum import Enum
 from maple_utility import *
-from anki_output import *
+from data_export import *
 from data_source import *
 import web_query
 import urllib.parse
@@ -85,8 +85,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.db_file = db_file
         self.db = None
         self.output_path = output_path
-        self.importer_r = AnkiImporter()
-        self.importer_rd = AnkiImporter()
+        # self.importer_r = AnkiImporter()
+        # self.importer_rd = AnkiImporter()
         self.is_saving = False
         self.has_changed = False
 
@@ -95,6 +95,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.confirmed_count = 0
 
         self.update_ui_after_record_count_changed()  # setup initial interface
+
+    def __del__(self):
+        del self.db
 
     # -------------------------------- Records Data Handling --------------------------------
 
@@ -179,7 +182,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             r["para"] = r["ext"] = r["hint"] = ""
             r["img"] = None  # no image
             r["freq"] = 0
-            r["card"] = 0
+            r["card"] = ""
             r["tips"] = ""
             self.entryList.addItem(r["subject"])  # signals has been blocked
 
@@ -347,7 +350,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.freqBar.setValue(r["freq"])
         self.freqBar.setToolTip(r["tips"])
-        self.cardType.setCurrentIndex(r["card"])
+        self.cardType.setCurrentIndex(self.cardType.findText(r["card"]))
 
         self.paraphrase.document().setPlainText(r["para"])
         self.extension.document().setPlainText(r["ext"])
@@ -408,7 +411,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def pron_clicked(self):
         sender = self.sender()
         if sender:
-            AnkiImporter.pronounce(self.cur_record()["subject"], sender.text())
+            DataExporter.pronounce(self.cur_record()["subject"], sender.text())
             self.cur_record()["pron"] = sender.text()
 
     def subject_changed(self):
@@ -474,11 +477,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.is_saving = True
 
-        # TODO: check whether there are valid entry
-        save_file_r = "%s/maple-r-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-        save_file_rd = "%s/maple-rd-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-        self.importer_r.open_file(save_file_r)
-        self.importer_rd.open_file(save_file_rd)
+        save_files = {}
+        exporters = {}
 
         record_count = len(self.records)
         for i in range(record_count):
@@ -496,19 +496,23 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             # Generate data
             if r["status"] == RecordStatus.CONFIRMED:
 
-                # Select proper importer
-                if r["card"] == 0:
-                    importer = self.importer_r
-                else:
-                    importer = self.importer_rd
+                # Select proper exporter
+                card_ = r["card"]
+                if card_ not in exporters.keys():  # it's the first time we encounter this type of card
+                    save_files[card_] = "%s/maple-%s-%s.txt" % \
+                                        (self.output_path, card_, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+                    exporters[card_] = DataExporter()
+                    exporters[card_].open_file(save_files[card_])
+
+                exporter = exporters[card_]
 
                 example = '%s<br>%s' % (r["usage"], r["source"])
-                mp3 = importer.generate_media(r["subject"], r["pron"])
+                mp3 = exporter.generate_media(r["subject"], r["pron"])
                 if r["img"]:
-                    img_file = importer.new_random_filename("png")
-                    r["img"].save("%s/%s" % (importer.media_path, img_file))
+                    img_file = exporter.new_random_filename("png")
+                    r["img"].save("%s/%s" % (exporter.media_path, img_file))
                     r["para"] += '<div><br><img src="%s"><br></div>' % img_file
-                importer.write_entry(r["subject"],
+                exporter.write_entry(r["subject"],
                                      "[sound:%s]" % mp3,
                                      r["para"],
                                      r["ext"],
@@ -520,11 +524,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             if r["word_id"] is not None:
                 if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
                     self.db.set_word_mature(r["word_id"], 100)
+
         if self.db is not None:
             self.db.commit_changes()
 
-        self.importer_r.close_file()
-        self.importer_rd.close_file()
+        for exporter in exporters.values():
+            exporter.close_file()
 
         self.entryList.setCurrentRow(record_count - 1)  # set selection to last
         self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
@@ -535,7 +540,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.is_saving = False
         self.has_changed = False
 
-        return "\n\n" + save_file_r + "\n\n" + save_file_rd
+        return "\n" + "\n".join(save_files.values())
 
     def closeEvent(self, event):
 
@@ -576,16 +581,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def set_word_freq(self, idx, freq, tips):
         self.records[idx]["freq"] = freq
         if freq >= card_rd_threshold_:
-            self.records[idx]["card"] = 1
+            self.records[idx]["card"] = "RD"
         else:
-            self.records[idx]["card"] = 0
+            self.records[idx]["card"] = "R"
         self.records[idx]["tips"] = tips
 
         if idx == self.cur_idx():
             self.freqBar.setMaximum(5)
             self.freqBar.setValue(freq)
             self.freqBar.setToolTip(tips)
-            self.cardType.setCurrentIndex(self.records[idx]["card"])
+            self.cardType.setCurrentIndex(self.cardType.findText(self.records[idx]["card"]))
 
     def load_collins(self, word):
 
@@ -640,7 +645,7 @@ $('.share-button').remove()
             "hint": "",
             "img": None,  # no image
             "freq": 0,
-            "card": 0,
+            "card": "",
             "tips": ""
         })
         self.entryList.addItem("")  # signals has been blocked
@@ -653,10 +658,7 @@ $('.share-button').remove()
             self.clear_records()
 
     def card_type_changed(self):
-        self.cur_record()["card"] = self.cardType.currentIndex()
-
-    def __del__(self):
-        del self.db
+        self.cur_record()["card"] = self.cardType.currentText()
 
 
 if __name__ == '__main__':

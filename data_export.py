@@ -6,7 +6,7 @@ import os
 import html
 
 
-class AnkiImporter:
+class DataExporter:
 
     def __init__(self):
         # TODO: instead of hard-coding find a better way to acquire these paths
@@ -32,7 +32,7 @@ class AnkiImporter:
         )
 
     def generate_media(self, word, speaker):
-        filename = AnkiImporter.new_random_filename("mp3")
+        filename = DataExporter.new_random_filename("mp3")
         subprocess.run(["say", "-v", speaker, "-r", "175", "-o", self.temp_media_file, word])
         with open(os.devnull, 'w') as devnull:
             subprocess.run(['lame', '-m', 'm', self.temp_media_file, "%s/%s" % (self.media_path, filename)],
