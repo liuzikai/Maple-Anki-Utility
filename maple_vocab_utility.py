@@ -49,6 +49,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.pronSamantha.clicked.connect(self.pron_clicked)
         self.pronDaniel.clicked.connect(self.pron_clicked)
         self.paraphrase.textChanged.connect(self.paraphrase_changed)
+        self.paraphrase.installEventFilter(self)
         self.extension.textChanged.connect(self.extension_changed)
         self.example.textChanged.connect(self.example_changed)
         self.hint.textChanged.connect(self.hint_changed)
@@ -393,7 +394,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discardBar.setValue(self.discard_count)
         self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
 
-    def editor_load_entry(self, idx):
+    def editor_load_entry(self, idx, forced_query=False):
         """
         Helper function to load an record entry to the main edit area
         :param idx: index of the entry
@@ -412,7 +413,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                     self.pronSamantha.click()  # including toggling and first-time pronouncing
                     self.set_record_status(idx, RecordStatus.TOPROCESS)
 
-                if self.autoQuery.isChecked():
+                if self.autoQuery.isChecked() or forced_query:
                     self.auto_query_timer.start(auto_query_delay_)
                     # Later query will be handled by timer signal
                     if r["freq"] == 0:  # not only UNVIEWED, but also when failure occurred last time and got nothing
@@ -521,11 +522,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         :param event:
         :return:
         """
-        if event.type() == QtCore.QEvent.KeyPress and widget is self.subject:
+        if event.type() == QtCore.QEvent.KeyPress and \
+                ((widget is self.subject) or
+                 (widget is self.paraphrase and self.paraphrase.toPlainText().strip() == "")):
             key = event.key()
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
                 self.cur_record()["status"] = RecordStatus.UNVIEWED
-                self.editor_load_entry(self.cur_idx())
+                self.editor_load_entry(self.cur_idx(), True)
                 return True
         return QtWidgets.QWidget.eventFilter(self, widget, event)
 
@@ -678,6 +681,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.freqBar.setTextVisible(True)
         if self.loading_collins:
             self.webView.page().runJavaScript("document.documentElement.outerHTML", self.collins_web_to_html_callback)
+        self.paraphrase.setFocus()
 
     def collins_web_to_html_callback(self, html_str):
 
