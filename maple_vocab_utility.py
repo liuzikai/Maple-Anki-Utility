@@ -18,7 +18,7 @@ from web_query import *
 db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 card_rd_threshold_ = 4
-auto_query_delay_ = 2000  # [ms]
+auto_query_delay_ = 3000  # [ms]
 
 
 class RecordStatus(Enum):
