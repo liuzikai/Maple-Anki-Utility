@@ -215,8 +215,15 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if len(self.records) > 0:
             self.entryList.setCurrentRow(0)  # will trigger editor_load_entry()
 
-    def html_extract(self, h):
-        return PyQuery(h)("p").html().strip()
+    def html_extract(self, h: str):
+        if len(h.strip()) == 0:
+            return ""
+        pq = PyQuery(h)
+        if pq:
+            p = pq("p")
+            if p:
+                return p.html().strip()
+        return h
 
     def save_all(self):
         """
@@ -255,13 +262,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 if r["source_enabled"] and r["source"] != "":
                     example += "<br>" + '<div align="right">' + self.html_extract(r["source"]) + '</div>'
                 mp3 = exporter.generate_media(r["subject"], r["pron"])
+                para = self.html_extract(r["para"])
                 if r["img"]:
                     img_file = exporter.new_random_filename("png")
                     r["img"].save("%s/%s" % (exporter.media_path, img_file))
-                    r["para"] += '<div><br><img src="%s"><br></div>' % img_file
+                    para += '<div><br><img src="%s"><br></div>' % img_file
                 exporter.write_entry(r["subject"],
                                      "[sound:%s]" % mp3,
-                                     self.html_extract(r["para"]),
+                                     para,
                                      self.html_extract(r["ext"]),
                                      example,
                                      r["hint"],
