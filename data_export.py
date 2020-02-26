@@ -8,10 +8,18 @@ import html
 
 class DataExporter:
 
+    OUTPUT_DELIMITER = "\t"
+    OUTPUT_ESCAPES = {
+        "\n": "<br>",
+        "\r": "<br>",
+        # ";": "&#59;"
+    }
+
     def __init__(self):
         # TODO: instead of hard-coding find a better way to acquire these paths
         self.media_path = "/Users/liuzikai/Library/Application Support/Anki2/liuzikai/collection.media"
         self.temp_media_file = "/tmp/isay.aiff"
+        self.f = None
 
     @staticmethod
     def new_random_filename(extension):
@@ -46,16 +54,26 @@ class DataExporter:
 
     def open_file(self, output_file):
         self.f = open(output_file, "w", encoding="utf-8")
+    
+    def escape_str(self, s: str):
+        ret = s
+        for k, v in self.OUTPUT_ESCAPES.items():
+            ret = ret.replace(k, v)
+        return ret
 
-    def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint, freq):
-        self.f.write("\t".join([
-            subject.replace("\n", "<br>").replace("\r", "<br>"),
-            pronunciation.replace("\n", "<br>").replace("\r", "<br>"),
-            paraphrase.replace("\n", "<br>").replace("\r", "<br>"),
-            extension.replace("\n", "<br>").replace("\r", "<br>"),
-            example.replace("\n", "<br>").replace("\r", "<br>"),
-            hint.replace("\n", "<br>").replace("\r", "<br>"),
-            str(freq)
+    def write_entry(self, subject, pronunciation, paraphrase, extension, example, hint, freq, has_r, has_s, has_d):
+        
+        self.f.write(self.OUTPUT_DELIMITER.join([
+            self.escape_str(subject),
+            self.escape_str(pronunciation),
+            self.escape_str(paraphrase),
+            self.escape_str(extension),
+            self.escape_str(example),
+            self.escape_str(hint),
+            self.escape_str(str(freq)),
+            self.escape_str(str(has_r)),
+            self.escape_str(str(has_s)),
+            self.escape_str(str(has_d))
         ]) + "\n")
 
     def close_file(self):

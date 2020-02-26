@@ -6,13 +6,13 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from PyQt5.QtCore import QTimer
 from datetime import datetime
 from enum import Enum
+from pyquery import PyQuery
 import urllib.parse
 
 from maple_utility import *
 from data_export import *
 from data_source import *
 from web_query import *
-
 
 # db_file_ = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab.db"
 db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
@@ -29,7 +29,6 @@ class RecordStatus(Enum):
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
-
     web_to_html_finished = pyqtSignal()
 
     def __init__(self, app, db_file, output_path, parent=None):
@@ -45,6 +44,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.entryList.selectionModel().selectionChanged.connect(self.selected_changed)
         self.subject.textChanged.connect(self.subject_changed)
         self.subject.installEventFilter(self)
+        self.subjectSuggest.setVisible(False)
+        self.subjectSuggest.clicked.connect(self.suggest_clicked)
         self.freqBar.mouseDoubleClickEvent = self.freq_bar_double_clicked
         self.pronSamantha.clicked.connect(self.pron_clicked)
         self.pronDaniel.clicked.connect(self.pron_clicked)
@@ -52,15 +53,20 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.paraphrase.installEventFilter(self)
         self.extension.textChanged.connect(self.extension_changed)
         self.example.textChanged.connect(self.example_changed)
+        self.example.installEventFilter(self)
+        self.checkSource.stateChanged.connect(self.source_check_changed)
+        self.source.textChanged.connect(self.source_changed)
+        self.source.installEventFilter(self)
         self.hint.textChanged.connect(self.hint_changed)
         self.saveAllButton.clicked.connect(self.save_all_clicked)
+        # These shortcuts are global, while the eventFilter needs to be connected to widgets manually
         self.next_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
         self.next_shortcut.activated.connect(self.confirm_clicked)
         self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_clicked)
         self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
         self.new_entry_shortcut.activated.connect(self.add_new_entry_clicked)
-        # TODO: handle event using filter
+        # There is no mouse signals for label. We use function override
         self.imageLabel.mousePressEvent = self.image_clicked
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
         self.loadKindle.clicked.connect(self.load_kindle_clicked)
@@ -68,7 +74,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.newEntry.clicked.connect(self.add_new_entry_clicked)
         self.clearList.clicked.connect(self.clear_list_clicked)
         self.saveBar.setVisible(False)
-        self.cardType.currentIndexChanged.connect(self.card_type_changed)
+        self.checkR.stateChanged.connect(self.card_type_changed)
+        self.checkS.stateChanged.connect(self.card_type_changed)
+        self.checkD.stateChanged.connect(self.card_type_changed)
         self.webView.loadStarted.connect(self.web_load_started)
         self.webView.loadProgress.connect(self.web_load_progress)
         self.webView.loadFinished.connect(self.web_load_finished)
@@ -76,8 +84,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.queryGoogleImage.clicked.connect(self.query_google_images_clicked)
         self.queryGoogleTranslate.clicked.connect(self.query_google_translate_clicked)
         self.queryGoogle.clicked.connect(self.query_google_clicked)
-        self.editor_components = [self.subject, self.pronSamantha, self.pronDaniel, self.paraphrase, self.imageLabel,
-                                  self.extension, self.example, self.source, self.hint, self.cardType,
+        self.editor_components = [self.subject, self.subjectSuggest, self.pronSamantha, self.pronDaniel,
+                                  self.paraphrase, self.imageLabel, self.extension, self.example, self.checkSource,
+                                  self.source, self.hint, self.checkR, self.checkS, self.checkD, self.autoQuery,
                                   self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
 
         # Setup threads and timers
@@ -96,6 +105,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.is_saving = False
         self.has_changed = False
         self.loading_collins = False
+        self.suggested_word = None
 
         self.records = []
         self.discard_count = 0
@@ -191,6 +201,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             r["freq"] = 0
             r["card"] = "R"
             r["tips"] = ""
+            r["source_enabled"] = (r["source"] != "")
+            r["usage"] = r["usage"].replace(r["subject"], u"<b>%s</b>" % r["subject"])
             self.entryList.addItem(r["subject"])  # signals has been blocked
 
         self.has_changed = False
@@ -202,6 +214,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # Setup initial entry, must be after necessary initialization
         if len(self.records) > 0:
             self.entryList.setCurrentRow(0)  # will trigger editor_load_entry()
+
+    def html_extract(self, h):
+        return PyQuery(h)("p").html().strip()
 
     def save_all(self):
         """
@@ -216,8 +231,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.is_saving = True
 
-        save_files = {}
-        exporters = {}
+        save_file = "%s/maple-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+        exporter = DataExporter()
+        exporter.open_file(save_file)
 
         record_count = len(self.records)
         for i in range(record_count):
@@ -235,17 +251,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             # Generate data
             if r["status"] == RecordStatus.CONFIRMED:
 
-                # Select proper exporter
-                card_ = r["card"]
-                if card_ not in exporters.keys():  # it's the first time we encounter this type of card
-                    save_files[card_] = "%s/maple-%s-%s.txt" % \
-                                        (self.output_path, card_, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-                    exporters[card_] = DataExporter()
-                    exporters[card_].open_file(save_files[card_])
-
-                exporter = exporters[card_]
-
-                example = '%s<br>%s' % (r["usage"], r["source"])
+                example = self.html_extract(r["usage"])
+                if r["source_enabled"] and r["source"] != "":
+                    example += "<br>" + '<div align="right">' + self.html_extract(r["source"]) + '</div>'
                 mp3 = exporter.generate_media(r["subject"], r["pron"])
                 if r["img"]:
                     img_file = exporter.new_random_filename("png")
@@ -253,11 +261,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                     r["para"] += '<div><br><img src="%s"><br></div>' % img_file
                 exporter.write_entry(r["subject"],
                                      "[sound:%s]" % mp3,
-                                     r["para"],
-                                     r["ext"],
+                                     self.html_extract(r["para"]),
+                                     self.html_extract(r["ext"]),
                                      example,
                                      r["hint"],
-                                     r["freq"])
+                                     r["freq"],
+                                     "1" if "R" in r["card"] else "",
+                                     "1" if "S" in r["card"] else "",
+                                     "1" if "D" in r["card"] else "")
 
             # Write back to DB
             if r["word_id"] is not None:
@@ -267,8 +278,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if self.db is not None:
             self.db.commit_changes()
 
-        for exporter in exporters.values():
-            exporter.close_file()
+        exporter.close_file()
 
         self.entryList.setCurrentRow(record_count - 1)  # set selection to last
         self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
@@ -279,7 +289,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.is_saving = False
         self.has_changed = False
 
-        return "\n" + "\n".join(save_files.values())
+        return "\n" + save_file
 
     def cur_idx(self):
         """
@@ -439,13 +449,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.freqBar.setValue(r["freq"])
         self.freqBar.setToolTip(r["tips"])
-        self.cardType.setCurrentIndex(self.cardType.findText(r["card"]))
+        self.checkR.setChecked("R" in r["card"])
+        self.checkS.setChecked("S" in r["card"])
+        self.checkD.setChecked("D" in r["card"])
 
-        self.paraphrase.document().setPlainText(r["para"])
-        self.extension.document().setPlainText(r["ext"])
-        self.example.document().setHtml(
-            r["usage"].replace(r["subject"], u"<b>%s</b>" % r["subject"]))  # bold won't be saved as html
-        self.source.document().setHtml(r["source"])  # read-only
+        self.paraphrase.document().setHtml(r["para"])
+        self.extension.document().setHtml(r["ext"])
+        self.example.document().setHtml(r["usage"])
+        self.checkSource.setChecked(r["source_enabled"])
+        self.source.document().setHtml(r["source"])
+        self.source.setEnabled(r["source_enabled"])
         self.hint.document().setPlainText(r["hint"])
 
         if r["img"]:
@@ -515,6 +528,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.entryList.item(self.cur_idx()).setText(subject)
         # self.editor_load_entry(self.cur_idx())
 
+    @pyqtSlot()
+    def suggest_clicked(self):
+        self.subject.blockSignals(True)
+        self.subject.setPlainText(self.suggested_word)
+        self.subject.blockSignals(False)
+        self.subjectSuggest.setVisible(False)
+
     def eventFilter(self, widget, event):
         """
         Handler of various key events
@@ -522,27 +542,53 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         :param event:
         :return:
         """
-        if event.type() == QtCore.QEvent.KeyPress and \
-                ((widget is self.subject) or
-                 (widget is self.paraphrase and self.paraphrase.toPlainText().strip() == "")):
+        if event.type() == QtCore.QEvent.KeyPress:
             key = event.key()
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
-                self.cur_record()["status"] = RecordStatus.UNVIEWED
-                self.editor_load_entry(self.cur_idx(), True)
-                return True
+                if (widget is self.subject) or (widget is self.paraphrase):
+                    self.cur_record()["status"] = RecordStatus.UNVIEWED
+                    self.editor_load_entry(self.cur_idx(), True)
+                    return True
+            elif key == QtCore.Qt.Key_B and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + B
+                if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
+                    widget: QtWidgets.QTextEdit
+                    cursor = widget.textCursor()
+                    fmt = cursor.charFormat()
+                    if fmt.fontWeight() == QtGui.QFont.Bold:
+                        fmt.setFontWeight(QtGui.QFont.Normal)
+                    else:
+                        fmt.setFontWeight(QtGui.QFont.Bold)
+                    cursor.mergeCharFormat(fmt)
+            elif key == QtCore.Qt.Key_I and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + I
+                if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
+                    widget: QtWidgets.QTextEdit
+                    cursor = widget.textCursor()
+                    fmt = cursor.charFormat()
+                    fmt.setFontItalic(not fmt.fontItalic())
+                    cursor.mergeCharFormat(fmt)
+
         return QtWidgets.QWidget.eventFilter(self, widget, event)
 
     @pyqtSlot()
     def paraphrase_changed(self):
-        self.cur_record()["para"] = self.paraphrase.toPlainText()
+        self.cur_record()["para"] = self.paraphrase.toHtml()
 
     @pyqtSlot()
     def extension_changed(self):
-        self.cur_record()["ext"] = self.extension.toPlainText()
+        self.cur_record()["ext"] = self.extension.toHtml()
 
     @pyqtSlot()
     def example_changed(self):
-        self.cur_record()["usage"] = self.example.toPlainText()  # bold won't be saved as html
+        self.cur_record()["usage"] = self.example.toHtml()
+
+    @pyqtSlot()
+    def source_changed(self):
+        self.cur_record()["source"] = self.source.toHtml()
+
+    @pyqtSlot()
+    def source_check_changed(self):
+        self.source.setEnabled(self.checkSource.isChecked())
+        self.cur_record()["source_enabled"] = self.checkSource.isChecked()
 
     @pyqtSlot()
     def hint_changed(self):
@@ -620,7 +666,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             "para": "",
             "ext": "",
             "usage": "",
-            "source": "",
+            "source": '<div align="right" style="font-size:12px"></div>',
+            "source_enabled": False,
             "hint": "",
             "img": None,  # no image
             "freq": 0,
@@ -628,8 +675,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             "tips": ""
         })
         self.entryList.addItem("")  # signals has been blocked
+        self.update_ui_after_record_count_changed()  # placed before editor_load_entry() for source to set correctly
         self.entryList.setCurrentRow(len(self.records) - 1)  # will trigger editor_load_entry()
-        self.update_ui_after_record_count_changed()
+
         self.subject.setFocus()
 
     def clear_list_clicked(self):
@@ -637,7 +685,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.clear_records()
 
     def card_type_changed(self):
-        self.cur_record()["card"] = self.cardType.currentText()
+        self.cur_record()["card"] = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
+                                                "S" if self.checkS.isChecked() else "",
+                                                "D" if self.checkD.isChecked() else "")
 
     @pyqtSlot()
     def query_collins_clicked(self):
@@ -673,15 +723,25 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @pyqtSlot(int)
     def web_load_progress(self, progress):
         self.freqBar.setValue(progress)
+        if self.webView.hasFocus():
+            self.paraphrase.setFocus()
 
     @pyqtSlot(bool)
     def web_load_finished(self, ok):
         self.freqBar.setMaximum(5)  # recover maximum
         self.freqBar.setValue(self.cur_record()["freq"])
         self.freqBar.setTextVisible(True)
-        if self.loading_collins:
+        self.suggested_word = get_word_from_collins_url(self.webView.page().url().url())
+        if self.suggested_word is not None:
             self.webView.page().runJavaScript("document.documentElement.outerHTML", self.collins_web_to_html_callback)
-        self.paraphrase.setFocus()
+        if self.suggested_word is not None and self.suggested_word != self.subject.toPlainText():
+            self.subjectSuggest.setText("Suggest: " + self.suggested_word)
+            self.subjectSuggest.setVisible(True)
+        else:
+            self.subjectSuggest.setVisible(False)
+
+        if self.webView.hasFocus():
+            self.paraphrase.setFocus()
 
     def collins_web_to_html_callback(self, html_str):
 
@@ -693,18 +753,21 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.webView.page().runJavaScript(js)  # run post js to eliminate ADs, etc.
 
     def set_word_freq(self, idx, freq, tips):
-        self.records[idx]["freq"] = freq
+        r = self.records[idx]
+        r["freq"] = freq
         if freq >= card_rd_threshold_:
-            self.records[idx]["card"] = "RD"
+            r["card"] = "RD"
         else:
-            self.records[idx]["card"] = "R"
-        self.records[idx]["tips"] = tips
+            r["card"] = "R"
+        r["tips"] = tips
 
         if idx == self.cur_idx():
             self.freqBar.setMaximum(5)
             self.freqBar.setValue(freq)
             self.freqBar.setToolTip(tips)
-            self.cardType.setCurrentIndex(self.cardType.findText(self.records[idx]["card"]))
+            self.checkR.setChecked("R" in r["card"])
+            self.checkS.setChecked("S" in r["card"])
+            self.checkD.setChecked("D" in r["card"])
 
     @pyqtSlot()
     def auto_query_timeout(self):
@@ -712,7 +775,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
 
 if __name__ == '__main__':
-
     app = QApplication(sys.argv)
     script_dir = os.path.dirname(os.path.realpath(__file__))
     app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))

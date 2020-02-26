@@ -47,6 +47,13 @@ def parse_collins_word_frequency(html):
         return 0, str(err)
 
 
+def get_word_from_collins_url(url: str):
+    if url.startswith(collins_url[:-2]):
+        return url[len(collins_url[:-2]):]
+    else:
+        return None
+
+
 # -------------------------------- Google Images --------------------------------
 
 google_image_url = u"https://www.google.com/search?tbm=isch&q=%s"
