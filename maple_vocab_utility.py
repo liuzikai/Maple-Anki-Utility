@@ -66,6 +66,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discard_shortcut.activated.connect(self.discard_clicked)
         self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
         self.new_entry_shortcut.activated.connect(self.add_new_entry_clicked)
+        self.smart_duplicate_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+N"), self)
+        self.smart_duplicate_shortcut.activated.connect(self.smart_duplicate_entry)
         # There is no mouse signals for label. We use function override
         self.imageLabel.mousePressEvent = self.image_clicked
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
@@ -476,6 +478,34 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         self.editor_block_signals(False)  # <---------------- main editor signals unblocked --v------
 
+    def add_new_single_entry(self, subject="", usage="", source_enabled=False,
+                             source='<div align="right" style="font-size:12px"></div>'):
+        new_entry = {
+            "status": RecordStatus.UNVIEWED,
+            "word_id": None,
+            "subject": subject,
+            "pron": "Unknown",
+            "para": "",
+            "ext": "",
+            "usage": usage,
+            "source": source,
+            "source_enabled": source_enabled,
+            "hint": "",
+            "img": None,  # no image
+            "freq": 0,
+            "card": "R",
+            "tips": ""
+        }
+
+        cur_idx = self.cur_idx()
+
+        self.records.insert(cur_idx + 1, new_entry)
+        self.entryList.insertItem(cur_idx + 1, "")
+        self.update_ui_after_record_count_changed()  # placed before editor_load_entry() for source to set correctly
+        self.entryList.setCurrentRow(cur_idx + 1)  # will trigger editor_load_entry()
+
+        self.subject.setFocus()
+
     def move_to_next(self):
         """
         Helper function to move to next record entry
@@ -538,9 +568,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @pyqtSlot()
     def suggest_clicked(self):
-        self.subject.blockSignals(True)
+        # self.subject.blockSignals(True)
         self.subject.setPlainText(self.suggested_word)
-        self.subject.blockSignals(False)
+        # self.subject.blockSignals(False)
         self.subjectSuggest.setVisible(False)
 
     def eventFilter(self, widget, event):
@@ -597,6 +627,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def source_check_changed(self):
         self.source.setEnabled(self.checkSource.isChecked())
         self.cur_record()["source_enabled"] = self.checkSource.isChecked()
+        self.source.setHtml('<div align="right">' + self.source.toHtml() + '</div>')
 
     @pyqtSlot()
     def hint_changed(self):
@@ -665,28 +696,24 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.web_query(collins_url, self.cur_record()["subject"])  # reload website
 
     @pyqtSlot()
-    def add_new_entry_clicked(self):
-        self.records.append({
-            "status": RecordStatus.UNVIEWED,
-            "word_id": None,
-            "subject": "",
-            "pron": "Unknown",
-            "para": "",
-            "ext": "",
-            "usage": "",
-            "source": '<div align="right" style="font-size:12px"></div>',
-            "source_enabled": False,
-            "hint": "",
-            "img": None,  # no image
-            "freq": 0,
-            "card": "R",
-            "tips": ""
-        })
-        self.entryList.addItem("")  # signals has been blocked
-        self.update_ui_after_record_count_changed()  # placed before editor_load_entry() for source to set correctly
-        self.entryList.setCurrentRow(len(self.records) - 1)  # will trigger editor_load_entry()
+    def smart_duplicate_entry(self):
+        cursor = self.example.textCursor()
+        selection = cursor.selectedText()
+        if selection == "":
+            return
+        r = self.cur_record()
+        self.add_new_single_entry("",
+                                  self.example.toPlainText().replace(selection, '<b>%s</b>' % selection),
+                                  r["source_enabled"],
+                                  r["source"])
 
-        self.subject.setFocus()
+    @pyqtSlot()
+    def add_new_entry_clicked(self):
+        if self.app.keyboardModifiers() == QtCore.Qt.ShiftModifier and self.cur_idx() != -1:
+            self.add_new_single_entry("", self.cur_record()["usage"], self.cur_record()["source_enabled"],
+                                      self.cur_record()["source"])
+        else:
+            self.add_new_single_entry()
 
     def clear_list_clicked(self):
         if self.confirm_before_action("clear list manually"):
