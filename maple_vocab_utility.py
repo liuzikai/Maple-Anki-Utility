@@ -500,7 +500,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         cur_idx = self.cur_idx()
 
         self.records.insert(cur_idx + 1, new_entry)
-        self.entryList.insertItem(cur_idx + 1, "")
+        self.entryList.insertItem(cur_idx + 1, subject)
         self.update_ui_after_record_count_changed()  # placed before editor_load_entry() for source to set correctly
         self.entryList.setCurrentRow(cur_idx + 1)  # will trigger editor_load_entry()
 
@@ -702,7 +702,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if selection == "":
             return
         r = self.cur_record()
-        self.add_new_single_entry("",
+        self.add_new_single_entry(selection,
                                   self.example.toPlainText().replace(selection, '<b>%s</b>' % selection),
                                   r["source_enabled"],
                                   r["source"])
