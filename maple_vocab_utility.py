@@ -17,8 +17,6 @@ from web_query import *
 # db_file_ = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab.db"
 db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
-card_rd_threshold_ = 4
-auto_query_delay_ = 3000  # [ms]
 
 
 class RecordStatus(Enum):
@@ -29,6 +27,9 @@ class RecordStatus(Enum):
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
+    AUTO_QUERY_DELAY = 3000  # [ms]
+    CARD_RD_THRESHOLD = 4
+    
     web_to_html_finished = pyqtSignal()
 
     def __init__(self, app, db_file, output_path, parent=None):
@@ -62,6 +63,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # These shortcuts are global, while the eventFilter needs to be connected to widgets manually
         self.next_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
         self.next_shortcut.activated.connect(self.confirm_clicked)
+        self.confirm_and_smart_duplicate_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Return"), self)
+        self.confirm_and_smart_duplicate_shortcut.activated.connect(self.confirm_and_smart_duplicate_entry)
         self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_clicked)
         self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
@@ -86,13 +89,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.queryGoogleImage.clicked.connect(self.query_google_images_clicked)
         self.queryGoogleTranslate.clicked.connect(self.query_google_translate_clicked)
         self.queryGoogle.clicked.connect(self.query_google_clicked)
-        self.editor_components = [self.subject, self.subjectSuggest, self.pronSamantha, self.pronDaniel,
+        self.webLoadingView.setVisible(False)
+        self.editor_components = [self.subject, self.subjectSuggest, self.freqBar, self.pronSamantha, self.pronDaniel,
                                   self.paraphrase, self.imageLabel, self.extension, self.example, self.checkSource,
                                   self.source, self.hint, self.checkR, self.checkS, self.checkD, self.autoQuery,
                                   self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
 
         # Setup threads and timers
-
+        self.query_immediately = False
         self.auto_query_timer = QTimer()
         self.auto_query_timer.setSingleShot(True)
         self.auto_query_timer.timeout.connect(self.auto_query_timeout)
@@ -324,6 +328,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         """
         if len(self.records) > 0:
             self.set_gui_enabled(True)
+            self.freqBar.setMaximum(5)
         else:
             self.editor_block_signals(True)
             self.subject.document().setPlainText("Congratulation!")  # subject change will lead to opening of dictionary
@@ -428,25 +433,17 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         if not self.is_saving:
             if r["subject"] != "":
-
                 if r["status"] == RecordStatus.UNVIEWED:
                     self.pronSamantha.click()  # including toggling and first-time pronouncing
                     self.set_record_status(idx, RecordStatus.TOPROCESS)
 
                 if self.autoQuery.isChecked() or forced_query:
-                    self.auto_query_timer.start(auto_query_delay_)
+                    if forced_query or self.query_immediately:
+                        self.request_query(0)
+                        self.query_immediately = False
+                    else:
+                        self.request_query(self.AUTO_QUERY_DELAY)
                     # Later query will be handled by timer signal
-                    if r["freq"] == 0:  # not only UNVIEWED, but also when failure occurred last time and got nothing
-                        self.freqBar.setMaximum(5)
-                        self.freqBar.setValue(0)
-                        self.freqBar.setTextVisible(False)
-                else:
-                    self.freqBar.setMaximum(5)  # recover maximum
-                    self.freqBar.setTextVisible(True)
-
-            else:
-                self.freqBar.setMaximum(5)  # recover maximum
-                self.freqBar.setTextVisible(True)
 
         self.editor_block_signals(True)  # ---------------- main editor signals blocked ---------------->
 
@@ -693,7 +690,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @pyqtSlot()
     def freq_bar_double_clicked(self, event):
-        self.web_query(collins_url, self.cur_record()["subject"])  # reload website
+        self.request_query(0)  # reload website immediately
+
+    @pyqtSlot()
+    def confirm_and_smart_duplicate_entry(self):
+        self.set_record_status(self.cur_idx(), RecordStatus.CONFIRMED)
+        self.smart_duplicate_entry()
 
     @pyqtSlot()
     def smart_duplicate_entry(self):
@@ -702,6 +704,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if selection == "":
             return
         r = self.cur_record()
+        self.query_immediately = True  # if auto query is enabled, surly we want to query the new word immediately
         self.add_new_single_entry(selection,
                                   self.example.toPlainText().replace(selection, '<b>%s</b>' % selection),
                                   r["source_enabled"],
@@ -726,7 +729,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @pyqtSlot()
     def query_collins_clicked(self):
-        self.web_query(collins_url, self.cur_record()["subject"])
+        self.request_query(0)
 
     @pyqtSlot()
     def query_google_images_clicked(self):
@@ -751,24 +754,24 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @pyqtSlot()
     def web_load_started(self):
-        self.freqBar.setMaximum(100)
-        self.freqBar.setValue(0)
-        self.freqBar.setTextVisible(False)
+        self.webLoadingBar.setValue(0)
+        self.webLoadingView.setVisible(True)
+        self.webView.setVisible(False)
 
     @pyqtSlot(int)
     def web_load_progress(self, progress):
-        self.freqBar.setValue(progress)
+        self.webLoadingBar.setValue(progress)
         if self.webView.hasFocus():
             self.paraphrase.setFocus()
 
     @pyqtSlot(bool)
     def web_load_finished(self, ok):
-        self.freqBar.setMaximum(5)  # recover maximum
-        self.freqBar.setValue(self.cur_record()["freq"])
-        self.freqBar.setTextVisible(True)
+        self.webLoadingView.setVisible(False)
+        self.webView.setVisible(True)
         self.suggested_word = get_word_from_collins_url(self.webView.page().url().url())
-        if self.suggested_word is not None:
+        if self.suggested_word is not None:  # is collins query
             self.webView.page().runJavaScript("document.documentElement.outerHTML", self.collins_web_to_html_callback)
+
         if self.suggested_word is not None and self.suggested_word != self.subject.toPlainText():
             self.subjectSuggest.setText("Suggest: " + self.suggested_word)
             self.subjectSuggest.setVisible(True)
@@ -790,19 +793,25 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def set_word_freq(self, idx, freq, tips):
         r = self.records[idx]
         r["freq"] = freq
-        if freq >= card_rd_threshold_:
+        if freq >= self.CARD_RD_THRESHOLD:
             r["card"] = "RD"
         else:
             r["card"] = "R"
         r["tips"] = tips
 
         if idx == self.cur_idx():
-            self.freqBar.setMaximum(5)
             self.freqBar.setValue(freq)
             self.freqBar.setToolTip(tips)
             self.checkR.setChecked("R" in r["card"])
             self.checkS.setChecked("S" in r["card"])
             self.checkD.setChecked("D" in r["card"])
+
+    def request_query(self, delay: float):
+        self.auto_query_timer.stop()
+        if delay == 0:
+            self.auto_query_timeout()
+        else:
+            self.auto_query_timer.start(delay)
 
     @pyqtSlot()
     def auto_query_timeout(self):

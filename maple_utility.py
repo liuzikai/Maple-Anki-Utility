@@ -13,7 +13,7 @@ class Ui_MapleUtility(object):
         MapleUtility.setObjectName("MapleUtility")
         MapleUtility.resize(1421, 888)
         self.mainWidget = QtWidgets.QWidget(MapleUtility)
-        self.mainWidget.setGeometry(QtCore.QRect(20, 22, 1303, 888))
+        self.mainWidget.setGeometry(QtCore.QRect(20, 22, 1303, 874))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -80,7 +80,7 @@ class Ui_MapleUtility(object):
 "\n"
 "QProgressBar::chunk {\n"
 "     background-color: rgb(10, 95, 255);\n"
-"     border-radius: 3px\n"
+"     border-radius: 3px;\n"
 " }")
         self.unreadBar.setProperty("value", 24)
         self.unreadBar.setTextVisible(False)
@@ -97,7 +97,7 @@ class Ui_MapleUtility(object):
 "\n"
 "QProgressBar::chunk {\n"
 "     background-color: rgb(41, 200, 50);\n"
-"     border-radius: 3px\n"
+"     border-radius: 3px;\n"
 " }")
         self.confirmedBar.setProperty("value", 24)
         self.confirmedBar.setTextVisible(False)
@@ -115,7 +115,7 @@ class Ui_MapleUtility(object):
 "\n"
 "QProgressBar::chunk {\n"
 "     background-color: rgb(253, 130, 8);\n"
-"     border-radius: 3px\n"
+"     border-radius: 3px;\n"
 " }")
         self.discardBar.setProperty("value", 24)
         self.discardBar.setTextVisible(False)
@@ -180,7 +180,7 @@ class Ui_MapleUtility(object):
 "     border-radius: 3px;\n"
 " }")
         self.freqBar.setMaximum(5)
-        self.freqBar.setProperty("value", 2)
+        self.freqBar.setProperty("value", 0)
         self.freqBar.setOrientation(QtCore.Qt.Vertical)
         self.freqBar.setObjectName("freqBar")
         self.horizontalLayout_5.addWidget(self.freqBar)
@@ -349,11 +349,42 @@ class Ui_MapleUtility(object):
         self.queryGoogleTranslate.setObjectName("queryGoogleTranslate")
         self.horizontalLayout_7.addWidget(self.queryGoogleTranslate)
         self.verticalLayout_2.addWidget(self.groupBox_3)
-        self.webView = QtWebEngineWidgets.QWebEngineView(self.widget_5)
+        self.widget_8 = QtWidgets.QWidget(self.widget_5)
+        self.widget_8.setMinimumSize(QtCore.QSize(600, 0))
+        self.widget_8.setMaximumSize(QtCore.QSize(600, 16777215))
+        self.widget_8.setObjectName("widget_8")
+        self.verticalLayout_6 = QtWidgets.QVBoxLayout(self.widget_8)
+        self.verticalLayout_6.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_6.setObjectName("verticalLayout_6")
+        self.webLoadingView = QtWidgets.QWidget(self.widget_8)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.webLoadingView.sizePolicy().hasHeightForWidth())
+        self.webLoadingView.setSizePolicy(sizePolicy)
+        self.webLoadingView.setObjectName("webLoadingView")
+        self.verticalLayout_7 = QtWidgets.QVBoxLayout(self.webLoadingView)
+        self.verticalLayout_7.setObjectName("verticalLayout_7")
+        self.webLoadingLabel = QtWidgets.QLabel(self.webLoadingView)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.webLoadingLabel.sizePolicy().hasHeightForWidth())
+        self.webLoadingLabel.setSizePolicy(sizePolicy)
+        self.webLoadingLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.webLoadingLabel.setObjectName("webLoadingLabel")
+        self.verticalLayout_7.addWidget(self.webLoadingLabel)
+        self.webLoadingBar = QtWidgets.QProgressBar(self.webLoadingView)
+        self.webLoadingBar.setProperty("value", 24)
+        self.webLoadingBar.setObjectName("webLoadingBar")
+        self.verticalLayout_7.addWidget(self.webLoadingBar)
+        self.verticalLayout_6.addWidget(self.webLoadingView)
+        self.webView = QtWebEngineWidgets.QWebEngineView(self.widget_8)
         self.webView.setMinimumSize(QtCore.QSize(600, 0))
         self.webView.setMaximumSize(QtCore.QSize(600, 16777215))
         self.webView.setObjectName("webView")
-        self.verticalLayout_2.addWidget(self.webView)
+        self.verticalLayout_6.addWidget(self.webView)
+        self.verticalLayout_2.addWidget(self.widget_8)
         self.horizontalLayout_3.addWidget(self.widget_5)
 
         self.retranslateUi(MapleUtility)
@@ -369,9 +400,9 @@ class Ui_MapleUtility(object):
         self.newEntry.setText(_translate("MapleUtility", "New Single Entry"))
         self.clearList.setText(_translate("MapleUtility", "Clear List"))
         self.groupBox.setTitle(_translate("MapleUtility", "Progress"))
-        self.label_8.setText(_translate("MapleUtility", "Unread"))
-        self.label_9.setText(_translate("MapleUtility", "Confirmed"))
-        self.label_10.setText(_translate("MapleUtility", "Discarded"))
+        self.label_8.setText(_translate("MapleUtility", "?"))
+        self.label_9.setText(_translate("MapleUtility", "✓"))
+        self.label_10.setText(_translate("MapleUtility", "✗"))
         self.label.setText(_translate("MapleUtility", "Subject"))
         self.subject.setPlainText(_translate("MapleUtility", "Subject"))
         self.subjectSuggest.setText(_translate("MapleUtility", "Suggest"))
@@ -413,5 +444,6 @@ class Ui_MapleUtility(object):
         self.queryGoogle.setText(_translate("MapleUtility", "Google"))
         self.queryGoogleImage.setText(_translate("MapleUtility", "Image"))
         self.queryGoogleTranslate.setText(_translate("MapleUtility", "Translate"))
+        self.webLoadingLabel.setText(_translate("MapleUtility", "Loading..."))
 
 from PyQt5 import QtWebEngineWidgets
