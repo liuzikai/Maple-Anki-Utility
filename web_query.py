@@ -10,7 +10,7 @@ from PyQt5 import QtWebEngineWidgets
 import urllib.parse
 
 
-mac_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8"
+mac_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Safari/605.1.15"
 ios_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 
 # -------------------------------- Collins --------------------------------
@@ -49,7 +49,10 @@ def parse_collins_word_frequency(html):
 
 def get_word_from_collins_url(url: str):
     if url.startswith(collins_url[:-2]):
-        return url[len(collins_url[:-2]):]
+        ret = url[len(collins_url[:-2]):]
+        if ret.find("?") != -1:
+            ret = ret[:ret.find("?")]
+        return ret
     else:
         return None
 

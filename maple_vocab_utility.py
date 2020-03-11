@@ -85,6 +85,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.webView.loadStarted.connect(self.web_load_started)
         self.webView.loadProgress.connect(self.web_load_progress)
         self.webView.loadFinished.connect(self.web_load_finished)
+        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
         self.queryCollins.clicked.connect(self.query_collins_clicked)
         self.queryGoogleImage.clicked.connect(self.query_google_images_clicked)
         self.queryGoogleTranslate.clicked.connect(self.query_google_translate_clicked)
@@ -99,18 +101,15 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.query_immediately = False
         self.auto_query_timer = QTimer()
         self.auto_query_timer.setSingleShot(True)
-        self.auto_query_timer.timeout.connect(self.auto_query_timeout)
+        self.auto_query_timer.timeout.connect(lambda: self.request_query(0))
 
         # Setup data
 
         self.db_file = db_file
         self.db = None
         self.output_path = output_path
-        # self.importer_r = AnkiImporter()
-        # self.importer_rd = AnkiImporter()
         self.is_saving = False
         self.has_changed = False
-        self.loading_collins = False
         self.suggested_word = None
 
         self.records = []
@@ -422,6 +421,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def editor_load_entry(self, idx, forced_query=False):
         """
         Helper function to load an record entry to the main edit area
+        :param forced_query:
         :param idx: index of the entry
         :return: None
         """
@@ -442,7 +442,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                         self.request_query(0)
                         self.query_immediately = False
                     else:
-                        self.request_query(self.AUTO_QUERY_DELAY)
+                        self.request_query(self.AUTO_QUERY_DELAY, True)
                     # Later query will be handled by timer signal
 
         self.editor_block_signals(True)  # ---------------- main editor signals blocked ---------------->
@@ -670,7 +670,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 self.imageLabel.setPixmap(px)
         elif event.button() == QtCore.Qt.RightButton:
             # web_interface.open_google_image_website(self.cur_record()["subject"])
-            self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+            # self.webView.page().profile().setHttpUserAgent(mac_user_agent)
             self.webView.load(QtCore.QUrl(google_image_url % urllib.parse.quote(self.cur_record()["subject"])))
 
     @pyqtSlot()
@@ -733,23 +733,20 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @pyqtSlot()
     def query_google_images_clicked(self):
-        self.web_query(google_image_url, self.cur_record()["subject"])
+        self.web_query(google_image_url % urllib.parse.quote(self.cur_record()["subject"]))
 
     @pyqtSlot()
     def query_google_translate_clicked(self):
-        self.web_query(google_translate_url, self.cur_record()["subject"])
+        self.web_query(google_translate_url % urllib.parse.quote(self.cur_record()["subject"]))
 
     @pyqtSlot()
     def query_google_clicked(self):
-        self.web_query(google_url, self.cur_record()["subject"])
+        self.web_query(google_url % urllib.parse.quote(self.cur_record()["subject"]))
 
     # -------------------------------- Query Handlers --------------------------------
 
-    def web_query(self, base_url, word):
-        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
-        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
-        self.loading_collins = (base_url == collins_url)
-        self.webView.load(QtCore.QUrl(base_url % urllib.parse.quote(word)))
+    def web_query(self, url):
+        self.webView.load(QtCore.QUrl(url))
         # Further handling will be completed by slots
 
     @pyqtSlot()
@@ -806,16 +803,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.checkS.setChecked("S" in r["card"])
             self.checkD.setChecked("D" in r["card"])
 
-    def request_query(self, delay: float):
+    def request_query(self, delay: float, skip_if_same_url=False):
         self.auto_query_timer.stop()
+        url = collins_url % self.cur_record()["subject"].replace(" ", "-")
+        if skip_if_same_url:
+            if self.webView.page().url().url() == url:
+                return
         if delay == 0:
-            self.auto_query_timeout()
+            self.web_query(url)
         else:
             self.auto_query_timer.start(delay)
-
-    @pyqtSlot()
-    def auto_query_timeout(self):
-        self.web_query(collins_url, self.cur_record()["subject"])
 
 
 if __name__ == '__main__':
