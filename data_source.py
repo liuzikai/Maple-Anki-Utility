@@ -57,10 +57,12 @@ class CSVDB:
         for i in range(len(self.csv_data)):
             entry = self.csv_data[i]
             if not new_only or entry[4] != "100":
-                source = '<div align="right" style="font-size:12px"><I>%s</I>' % entry[2]
-                if entry[3] != "":
-                    source += ', %s' % entry[3]
-                source += "</div>"
+                source = ""
+                if entry[2] != "":
+                    source += '<div align="right" style="font-size:12px"><I>%s</I>' % entry[2]
+                    if entry[3] != "":
+                        source += ', %s' % entry[3]
+                    source += "</div>"
                 records.append({
                     "word_id": str(i),
                     "subject": entry[0],

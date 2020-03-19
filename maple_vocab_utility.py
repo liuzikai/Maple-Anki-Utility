@@ -580,7 +580,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if event.type() == QtCore.QEvent.KeyPress:
             key = event.key()
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
-                if (widget is self.subject) or (widget is self.paraphrase):
+                if (widget is self.subject) or (widget is self.paraphrase and self.paraphrase.toPlainText() == ""):
                     self.cur_record()["status"] = RecordStatus.UNVIEWED
                     self.editor_load_entry(self.cur_idx(), True)
                     return True
