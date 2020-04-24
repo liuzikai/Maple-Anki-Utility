@@ -779,7 +779,14 @@ p, li { white-space: pre-wrap; }
            </widget>
           </item>
           <item>
-           <widget class="QWidget" name="webProgressFrame" native="true"/>
+           <widget class="QLabel" name="queryStatusLabel">
+            <property name="text">
+             <string>0/0/0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="queryCollins">
@@ -826,7 +833,7 @@ p, li { white-space: pre-wrap; }
            <height>16777215</height>
           </size>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_6">
+         <layout class="QVBoxLayout" name="webViewVerticalLayout">
           <property name="leftMargin">
            <number>0</number>
           </property>

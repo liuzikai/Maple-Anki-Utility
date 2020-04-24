@@ -24,32 +24,45 @@ def html_extract(h: str) -> str:
     return h
 
 
-class DataManager:
+class DataManager(QtCore.QObject):
+
+    # Signals
+    record_status_changed = QtCore.pyqtSignal(int, int, int)  # index, old_status, new_status
+    record_cleared = QtCore.pyqtSignal()
+    record_inserted = QtCore.pyqtSignal(int, bool)  # index, batch_loading(True)/add_single(False)
+    record_count_changed = QtCore.pyqtSignal()
+    save_progress = QtCore.pyqtSignal(int)  # index to highlight
 
     def __init__(self):
-        self.db = None
+
+        super().__init__()
+
+        self._db = None
         self.has_changed = False
 
-        self.records = []
-        self.counts = [0] * 4
-
-        self.save_progress = QtCore.pyqtSignal(int)
-        self.record_status_changed = QtCore.pyqtSignal(int, int, int)
-        self.record_cleared = QtCore.pyqtSignal()
-        self.record_inserted = QtCore.pyqtSignal(int)
-        self.record_count_changed = QtCore.pyqtSignal()
+        self._records = []
+        self._counts = [0] * 4
 
     def __del__(self):
-        del self.db
+        del self._db
 
-    def clear_records(self) -> None:
+    def get(self, idx: int) -> dict:
+        return self._records[idx]
+
+    def count(self, status=None) -> int:
+        if status is None:
+            return len(self._records)
+        else:
+            return self._counts[status]
+
+    def clear(self) -> None:
         """
-        Helper function to clear all records.
+        Helper function to clear all _records.
         :return: None
         """
 
-        self.records = []
-        self.counts = [0] * 4
+        self._records = []
+        self._counts = [0] * 4
 
         # Signals
         self.record_cleared.emit()
@@ -57,48 +70,48 @@ class DataManager:
 
     def reload_kindle_data(self, db_file: str) -> bool:
         """
-        Clear records and load records from Kindle.
+        Clear _records and load _records from Kindle.
         :return: True if file exists, False otherwise
         """
         if not os.path.isfile(db_file):
             return False
 
         # Set up database to KindleDB
-        if self.db is not None:
-            del self.db
-            self.db = None
-        self.db = KindleDB(db_file)
+        if self._db is not None:
+            del self._db
+            self._db = None
+        self._db = KindleDB(db_file)
 
-        self.reload_from_db()
+        self._reload_from_db()
 
         return True
 
     def reload_csv_data(self, csv_file: str) -> bool:
         """
-        Clear records and load records from CSV file.
+        Clear _records and load _records from CSV file.
         :return: True if file exists, False otherwise
         """
         if not os.path.isfile(csv_file):
             return False
 
         # Setup database to CSV DB
-        if self.db is not None:
-            del self.db
-            self.db = None
-        self.db = CSVDB(csv_file)
+        if self._db is not None:
+            del self._db
+            self._db = None
+        self._db = CSVDB(csv_file)
 
-        self.reload_from_db()
+        self._reload_from_db()
 
         return True
 
-    def reload_from_db(self) -> None:
+    def _reload_from_db(self) -> None:
 
-        self.clear_records()  # will emit signals
+        self.clear()  # will emit signals
 
-        self.records = self.db.fetch_all(new_only=True)
+        self._records = self._db.fetch_all(new_only=True)
 
         # Initialize additional fields
-        for r in self.records:
+        for i, r in enumerate(self._records):
             r["status"] = UNVIEWED
             r["pron"] = "Unknown"
             r["para"] = r["ext"] = r["hint"] = ""
@@ -108,21 +121,17 @@ class DataManager:
             r["tips"] = ""
             r["source_enabled"] = (r["source"] != "")
             r["usage"] = r["usage"].replace(r["subject"], u"<b>%s</b>" % r["subject"])
-            # TODO: record_insert emit
 
-        self.counts[UNVIEWED] = len(self.records)
+            self.record_inserted.emit(i, True)
+
+        self._counts[UNVIEWED] = len(self._records)
+        self._counts[TOPROCESS] = self._counts[CONFIRMED] = self._counts[DISCARDED] = 0
 
         self.record_count_changed.emit()
 
-    def get_count(self, status=None) -> int:
-        if status is None:
-            return len(self.records)
-        else:
-            return self.counts[status]
-
     def save_all(self, output_path: str) -> str:
         """
-        Helper function to save all records
+        Helper function to save all _records
         :return: Saved filename
         """
 
@@ -130,10 +139,10 @@ class DataManager:
         exporter = DataExporter()
         exporter.open_file(save_file)
 
-        record_count = len(self.records)
+        record_count = len(self._records)
         for i in range(record_count):
 
-            r = self.records[i]
+            r = self._records[i]
 
             # Set UI
             if record_count < 150 or i % (int(record_count / 100)) == 0 or r["status"] in [CONFIRMED, DISCARDED]:
@@ -166,10 +175,10 @@ class DataManager:
             # Write back to DB
             if r["word_id"] is not None:
                 if r["status"] == CONFIRMED or r["status"] == DISCARDED:
-                    self.db.set_word_mature(r["word_id"], 100)
+                    self._db.set_word_mature(r["word_id"], 100)
 
-        if self.db is not None:
-            self.db.commit_changes()
+        if self._db is not None:
+            self._db.commit_changes()
 
         exporter.close_file()
 
@@ -177,25 +186,25 @@ class DataManager:
 
         return save_file
 
-    def set_record_status(self, idx: int, status: int) -> None:
+    def set_status(self, idx: int, status: int) -> None:
         """
-        Set UI and change record entry.
+        Set record status
         :param idx: index of record entry
         :param status: one of RecordStatus
         :return:
         """
 
-        if self.records[idx]["status"] == status:  # nothing needs to be done
+        if self._records[idx]["status"] == status:  # nothing needs to be done
             return
 
         if status == CONFIRMED or status == DISCARDED:
             self.has_changed = True
 
-        old_status = self.records[idx]["status"]
+        old_status = self._records[idx]["status"]
 
-        self.counts[old_status] -= 1
-        self.records[idx]["status"] = status
-        self.counts[status] += 1
+        self._counts[old_status] -= 1
+        self._records[idx]["status"] = status
+        self._counts[status] += 1
 
         self.record_status_changed.emit(idx, old_status, status)
         self.record_count_changed.emit()
@@ -219,7 +228,7 @@ class DataManager:
             "tips": ""
         }
 
-        self.records.insert(idx, new_entry)
+        self._records.insert(idx, new_entry)
 
-        self.record_inserted.emit(idx)
+        self.record_inserted.emit(idx, False)
         self.record_count_changed.emit()
