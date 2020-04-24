@@ -15,10 +15,7 @@ SAVE_PATH = "/Users/liuzikai/Desktop"
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
-
     CARD_RD_THRESHOLD = 4
-
-    web_to_html_finished = pyqtSignal()
 
     def __init__(self, app, parent=None):
 
@@ -70,11 +67,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.checkR.stateChanged.connect(self.card_type_changed)
         self.checkS.stateChanged.connect(self.card_type_changed)
         self.checkD.stateChanged.connect(self.card_type_changed)
-        self.webView.loadStarted.connect(self.web_load_started)
-        self.webView.loadProgress.connect(self.web_load_progress)
-        self.webView.loadFinished.connect(self.web_load_finished)
-        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
-        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
         self.queryCollins.clicked.connect(self.query_collins_clicked)
         self.queryGoogleImage.clicked.connect(self.query_google_images_clicked)
         self.queryGoogleTranslate.clicked.connect(self.query_google_translate_clicked)
@@ -91,7 +83,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         # Setup DataManager and connections
         self.data = DataManager()
-        self.data.record_status_changed.connect(self.handle_record_status_changed) # index, old_status, new_status
+        self.data.record_status_changed.connect(self.handle_record_status_changed)  # index, old_status, new_status
         self.data.record_cleared.connect(self.handle_record_clear)
         self.data.record_inserted.connect(self.handle_record_insertion)  # index, batch_loading(True)/add_single(False)
         self.data.record_count_changed.connect(self.update_ui_after_record_count_changed)
@@ -100,9 +92,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # Setup initial interface
         self.update_ui_after_record_count_changed()
 
-
     # TODO: add QtWebEngineView dynamically
-    def ():
+    def():
         self.verticalLayout_6.addWidget(self.webLoadingView)
         self.webView = QtWebEngineWidgets.QWebEngineView(self.widget_8)
         self.webView.setMinimumSize(QtCore.QSize(600, 0))
@@ -110,6 +101,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.webView.setObjectName("webView")
         self.verticalLayout_6.addWidget(self.webView)
         self.verticalLayout_2.addWidget(self.widget_8)
+
+        self.webView.loadStarted.connect(self.web_load_started)
+        self.webView.loadProgress.connect(self.web_load_progress)
+        self.webView.loadFinished.connect(self.web_load_finished)
+        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
+        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
 
     @QtCore.pyqtSlot()
     def update_ui_after_record_count_changed(self):
@@ -129,13 +126,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.set_gui_enabled(False)
 
         self.unreadBar.setMaximum(self.data.count())
-        self.unreadBar.setValue(self.data.count(UNVIEWED) + self.data.count(TOPROCESS))
+        self.unreadBar.setValue(self.data.count(self.data.UNVIEWED) + self.data.count(self.data.TOPROCESS))
         self.unreadBar.setToolTip("%d unread" % self.unreadBar.value())
         self.confirmedBar.setMaximum(self.data.count())
-        self.confirmedBar.setValue(self.data.count(CONFIRMED))
+        self.confirmedBar.setValue(self.data.count(self.data.CONFIRMED))
         self.confirmedBar.setToolTip("%d confirmed" % self.confirmedBar.value())
         self.discardBar.setMaximum(self.data.count())
-        self.discardBar.setValue(self.data.count(DISCARDED))
+        self.discardBar.setValue(self.data.count(self.data.DISCARDED))
         self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
 
     def confirm_before_action(self, action_name):
@@ -167,9 +164,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         if not self.is_saving:
             if r["subject"] != "":
-                if r["status"] == UNVIEWED:
+                if r["status"] == self.data.UNVIEWED:
                     self.pronSamantha.click()  # including toggling and first-time pronouncing
-                    self.data.set_status(idx, TOPROCESS)
+                    self.data.set_status(idx, self.data.TOPROCESS)
 
                 if self.autoQuery.isChecked() or forced_query:
                     if forced_query or self.query_immediately:
@@ -243,12 +240,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def confirm_clicked(self):
-        self.data.set_status(self.cur_idx(), CONFIRMED)
+        self.data.set_status(self.cur_idx(), self.data.CONFIRMED)
         self.move_to_next()
 
     @QtCore.pyqtSlot()
     def discard_clicked(self):
-        self.data.set_status(self.cur_idx(), DISCARDED)
+        self.data.set_status(self.cur_idx(), self.data.DISCARDED)
         self.move_to_next()
 
     @QtCore.pyqtSlot()
@@ -282,7 +279,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             key = event.key()
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
                 if (widget is self.subject) or (widget is self.paraphrase and self.paraphrase.toPlainText() == ""):
-                    self.data.set_status(self.cur_idx(), UNVIEWED)
+                    self.data.set_status(self.cur_idx(), self.data.UNVIEWED)
                     self.editor_load_entry(self.cur_idx(), True)
                     return True
             elif key == QtCore.Qt.Key_B and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + B
@@ -338,8 +335,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                       "Confirmed and discarded ones will be marked as mutual on Kindle. " \
                       "Please make sure kindle is connected. \n\n" \
                       "Continue to save?" % (
-                          self.data.count(CONFIRMED), self.data.count(DISCARDED),
-                          self.data.count(UNVIEWED) + self.data.count(TOPROCESS))
+                          self.data.count(self.data.CONFIRMED), self.data.count(self.data.DISCARDED),
+                          self.data.count(self.data.UNVIEWED) + self.data.count(self.data.TOPROCESS))
 
         ret = QtWidgets.QMessageBox.question(self, "Confirm", confirm_str, QtWidgets.QMessageBox.Yes,
                                              QtWidgets.QMessageBox.Cancel)
@@ -362,13 +359,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
             self.is_saving = False
 
-            QtWidgets.QMessageBox.information(self, "Success",
-                                              "Saved %d entries. Discard %d entries. %d entries unchanged.\n\n" \
-                                              "Saved to %s" % (
-                                                  self.data.count(CONFIRMED), self.data.count(DISCARDED),
-                                                  self.data.count(UNVIEWED) + self.data.count(TOPROCESS),
-                                                  filename),
-                                              QtWidgets.QMessageBox.Ok)
+            info = "Saved %d entries. Discard %d entries. %d entries unchanged.\n\n" \
+                   "Saved to %s" % (
+                       self.data.count(self.data.CONFIRMED),
+                       self.data.count(self.data.DISCARDED),
+                       self.data.count(self.data.UNVIEWED) + self.data.count(self.data.TOPROCESS),
+                       filename)
+            QtWidgets.QMessageBox.information(self, "Success", info, QtWidgets.QMessageBox.Ok)
 
     def closeEvent(self, event):
         if self.confirm_before_action("exit"):
@@ -432,7 +429,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def confirm_and_smart_duplicate_entry(self):
-        self.data.set_status(self.cur_idx(), CONFIRMED)
+        self.data.set_status(self.cur_idx(), self.data.CONFIRMED)
         self.smart_duplicate_entry()
 
     @QtCore.pyqtSlot()
@@ -481,13 +478,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @QtCore.pyqtSlot(int, int, int)
     def handle_record_status_changed(self, idx: int, _: int, new_status: int):
         f = self.entryList.font()
-        if new_status == TOPROCESS:
+        if new_status == self.data.TOPROCESS:
             f.setItalic(False)
             f.setStrikeOut(False)
-        elif new_status == CONFIRMED:
+        elif new_status == self.data.CONFIRMED:
             f.setItalic(True)
             f.setStrikeOut(False)
-        elif new_status == DISCARDED:
+        elif new_status == self.data.DISCARDED:
             f.setItalic(False)
             f.setStrikeOut(True)
         self.entryList.item(idx).setFont(f)
@@ -508,7 +505,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def query_google_clicked(self):
         self.web_query(google_url % urllib.parse.quote(self.cur_record()["subject"]))
 
-
     def set_word_freq(self, idx: int, freq: int, tips: str) -> None:
         r = self.data.get(idx)
         r["freq"] = freq
@@ -524,7 +520,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.checkR.setChecked("R" in r["card"])
             self.checkS.setChecked("S" in r["card"])
             self.checkD.setChecked("D" in r["card"])
-
 
 
 if __name__ == '__main__':

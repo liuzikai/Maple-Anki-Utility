@@ -7,11 +7,6 @@ from data_source import *
 from data_export import *
 from PyQt5 import QtCore
 
-UNVIEWED = 0  # not viewed yet
-TOPROCESS = 1  # already viewed at least one (has been pronounced)
-CONFIRMED = 2
-DISCARDED = 3
-
 
 def html_extract(h: str) -> str:
     if len(h.strip()) == 0:
@@ -25,6 +20,11 @@ def html_extract(h: str) -> str:
 
 
 class DataManager(QtCore.QObject):
+
+    UNVIEWED = 0  # not viewed yet
+    TOPROCESS = 1  # already viewed at least one (has been pronounced)
+    CONFIRMED = 2
+    DISCARDED = 3
 
     # Signals
     record_status_changed = QtCore.pyqtSignal(int, int, int)  # index, old_status, new_status
@@ -112,7 +112,7 @@ class DataManager(QtCore.QObject):
 
         # Initialize additional fields
         for i, r in enumerate(self._records):
-            r["status"] = UNVIEWED
+            r["status"] = self.UNVIEWED
             r["pron"] = "Unknown"
             r["para"] = r["ext"] = r["hint"] = ""
             r["img"] = None  # no image
@@ -124,8 +124,8 @@ class DataManager(QtCore.QObject):
 
             self.record_inserted.emit(i, True)
 
-        self._counts[UNVIEWED] = len(self._records)
-        self._counts[TOPROCESS] = self._counts[CONFIRMED] = self._counts[DISCARDED] = 0
+        self._counts[self.UNVIEWED] = len(self._records)
+        self._counts[self.TOPROCESS] = self._counts[self.CONFIRMED] = self._counts[self.DISCARDED] = 0
 
         self.record_count_changed.emit()
 
@@ -145,12 +145,12 @@ class DataManager(QtCore.QObject):
             r = self._records[i]
 
             # Set UI
-            if record_count < 150 or i % (int(record_count / 100)) == 0 or r["status"] in [CONFIRMED, DISCARDED]:
+            if record_count < 150 or i % (int(record_count / 100)) == 0 or r["status"] in [self.CONFIRMED, self.DISCARDED]:
                 # Only show parts of animation to accelerate saving process
                 self.save_progress.emit(i)
 
             # Generate data
-            if r["status"] == CONFIRMED:
+            if r["status"] == self.CONFIRMED:
 
                 example = html_extract(r["usage"])
                 if r["source_enabled"] and r["source"] != "":
@@ -174,7 +174,7 @@ class DataManager(QtCore.QObject):
 
             # Write back to DB
             if r["word_id"] is not None:
-                if r["status"] == CONFIRMED or r["status"] == DISCARDED:
+                if r["status"] == self.CONFIRMED or r["status"] == self.DISCARDED:
                     self._db.set_word_mature(r["word_id"], 100)
 
         if self._db is not None:
@@ -197,7 +197,7 @@ class DataManager(QtCore.QObject):
         if self._records[idx]["status"] == status:  # nothing needs to be done
             return
 
-        if status == CONFIRMED or status == DISCARDED:
+        if status == self.CONFIRMED or status == self.DISCARDED:
             self.has_changed = True
 
         old_status = self._records[idx]["status"]
@@ -212,7 +212,7 @@ class DataManager(QtCore.QObject):
     def add_new_single_entry(self, idx: int, subject: str = "", usage: str = "", source_enabled: bool = False,
                              source: str = '<div align="right" style="font-size:12px"></div>') -> None:
         new_entry = {
-            "status": UNVIEWED,
+            "status": self.UNVIEWED,
             "word_id": None,
             "subject": subject,
             "pron": "Unknown",
