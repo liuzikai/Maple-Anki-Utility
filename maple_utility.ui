@@ -779,6 +779,9 @@ p, li { white-space: pre-wrap; }
            </widget>
           </item>
           <item>
+           <widget class="QWidget" name="webProgressFrame" native="true"/>
+          </item>
+          <item>
            <widget class="QPushButton" name="queryCollins">
             <property name="text">
              <string>Collins</string>
@@ -810,7 +813,7 @@ p, li { white-space: pre-wrap; }
         </widget>
        </item>
        <item>
-        <widget class="QWidget" name="widget_8" native="true">
+        <widget class="QWidget" name="webViewFrame" native="true">
          <property name="minimumSize">
           <size>
            <width>600</width>
@@ -871,22 +874,6 @@ p, li { white-space: pre-wrap; }
             </layout>
            </widget>
           </item>
-          <item>
-           <widget class="QWebEngineView" name="webView" native="true">
-            <property name="minimumSize">
-             <size>
-              <width>600</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>600</width>
-              <height>16777215</height>
-             </size>
-            </property>
-           </widget>
-          </item>
          </layout>
         </widget>
        </item>
@@ -896,14 +883,6 @@ p, li { white-space: pre-wrap; }
    </layout>
   </widget>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>QWebEngineView</class>
-   <extends>QWidget</extends>
-   <header>qwebengineview.h</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>

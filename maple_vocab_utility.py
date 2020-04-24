@@ -5,13 +5,13 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from PyQt5.QtCore import QTimer
 from datetime import datetime
-from enum import Enum
 from pyquery import PyQuery
 import urllib.parse
 
 from maple_utility import *
 from data_export import *
 from data_source import *
+from data_manager import *
 from web_query import *
 
 # db_file_ = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab.db"
@@ -19,11 +19,7 @@ db_file_ = "/Volumes/Kindle/system/vocabulary/vocab.db"
 output_path_ = "/Users/liuzikai/Desktop"
 
 
-class RecordStatus(Enum):
-    UNVIEWED = -1  # not viewed yet
-    TOPROCESS = 0  # already viewed at least one (has been pronounced)
-    CONFIRMED = 1
-    DISCARDED = 2
+
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
@@ -103,220 +99,19 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.auto_query_timer.setSingleShot(True)
         self.auto_query_timer.timeout.connect(lambda: self.request_query(0))
 
-        # Setup data
-
-        self.db_file = db_file
-        self.db = None
-        self.output_path = output_path
-        self.is_saving = False
-        self.has_changed = False
         self.suggested_word = None
 
-        self.records = []
-        self.discard_count = 0
-        self.confirmed_count = 0
+        self.is_saving = False
 
         self.update_ui_after_record_count_changed()  # setup initial interface
 
-    def __del__(self):
-        del self.db
+
 
     # -------------------------------- Records Data Handling --------------------------------
 
-    def clear_records(self):
-        """
-        Helper function to clear all records.
-        :return: None
-        """
 
-        self.records = []
-        self.discard_count = 0
-        self.confirmed_count = 0
+        self.data = DataManager()
 
-        self.entryList.blockSignals(True)
-        self.entryList.clear()
-        QtCore.QCoreApplication.processEvents()
-        self.entryList.blockSignals(False)
-
-        self.update_ui_after_record_count_changed()
-
-    def reload_kindle_data(self):
-        """
-        Clear records and load records from Kindle.
-        :return: None
-        """
-
-        if os.path.isfile(self.db_file):
-
-            # Set up database to KindleDB
-            if self.db is not None:
-                del self.db
-                self.db = None
-            self.db = KindleDB(self.db_file)
-
-            self.reload_db()  # clear records and load data from db
-        else:
-            msg_box = QtWidgets.QMessageBox()
-            msg_box.setWindowTitle("Error")
-            msg_box.setText("Failed to find Kindle DB file. Please make sure Kindle has connected.")
-            msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-            msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
-            msg_box.exec_()
-            return
-
-    def reload_csv_data(self):
-        """
-        Clear records and load records from CSV file.
-        :return: None
-        """
-
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        csv_file, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
-                                                  "CSV Files (*.csv);;All Files (*)", options=options)
-        if csv_file:
-
-            # Setup database to CSV DB
-            if self.db is not None:
-                del self.db
-                self.db = None
-            self.db = CSVDB(csv_file)
-
-            self.reload_db()  # clear records and load data from db
-
-    def reload_db(self):
-
-        """
-        Helper function to clear records and load entries from database (KindleDB or CSVDB).
-        :return: None
-        """
-
-        self.clear_records()
-
-        self.records = self.db.fetch_all(new_only=True)
-
-        self.entryList.blockSignals(True)  # ---------------- entry list signals blocked ---------------->
-
-        # Initialize additional fields and add to list
-        for r in self.records:
-            r["status"] = RecordStatus.UNVIEWED
-            r["pron"] = "Unknown"
-            r["para"] = r["ext"] = r["hint"] = ""
-            r["img"] = None  # no image
-            r["freq"] = 0
-            r["card"] = "R"
-            r["tips"] = ""
-            r["source_enabled"] = (r["source"] != "")
-            r["usage"] = r["usage"].replace(r["subject"], u"<b>%s</b>" % r["subject"])
-            self.entryList.addItem(r["subject"])  # signals has been blocked
-
-        self.has_changed = False
-
-        self.entryList.blockSignals(False)  # <---------------- entry list signals unblocked ----------------
-
-        self.update_ui_after_record_count_changed()  # need to before loading first entry to make gui enabled
-
-        # Setup initial entry, must be after necessary initialization
-        if len(self.records) > 0:
-            self.entryList.setCurrentRow(0)  # will trigger editor_load_entry()
-
-    def html_extract(self, h: str):
-        if len(h.strip()) == 0:
-            return ""
-        pq = PyQuery(h)
-        if pq:
-            p = pq("p")
-            if p:
-                return p.html().strip()
-        return h
-
-    def save_all(self):
-        """
-        Helper function to save all records
-        :return: None
-        """
-
-        self.set_gui_enabled(False)  # ---------------- GUI disabled ---------------->
-        self.editor_block_signals(True)  # ---------------- editor signals blocked ---------------->
-        self.saveBar.setVisible(True)
-        self.saveBar.setMaximum(len(self.records))
-
-        self.is_saving = True
-
-        save_file = "%s/maple-%s.txt" % (self.output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-        exporter = DataExporter()
-        exporter.open_file(save_file)
-
-        record_count = len(self.records)
-        for i in range(record_count):
-
-            r = self.records[i]
-
-            # Set UI
-            if record_count < 150 or i % (int(record_count / 100)) == 0 \
-                    or r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
-                # Only show parts of animation to accelerate saving process
-                self.saveBar.setValue(i)
-                self.entryList.setCurrentRow(i)
-                QtCore.QCoreApplication.processEvents()
-
-            # Generate data
-            if r["status"] == RecordStatus.CONFIRMED:
-
-                example = self.html_extract(r["usage"])
-                if r["source_enabled"] and r["source"] != "":
-                    example += "<br>" + '<div align="right">' + self.html_extract(r["source"]) + '</div>'
-                mp3 = exporter.generate_media(r["subject"], r["pron"])
-                para = self.html_extract(r["para"])
-                if r["img"]:
-                    img_file = exporter.new_random_filename("png")
-                    r["img"].save("%s/%s" % (exporter.media_path, img_file))
-                    para += '<div><br><img src="%s"><br></div>' % img_file
-                exporter.write_entry(r["subject"],
-                                     "[sound:%s]" % mp3,
-                                     para,
-                                     self.html_extract(r["ext"]),
-                                     example,
-                                     r["hint"],
-                                     r["freq"],
-                                     "1" if "R" in r["card"] else "",
-                                     "1" if "S" in r["card"] else "",
-                                     "1" if "D" in r["card"] else "")
-
-            # Write back to DB
-            if r["word_id"] is not None:
-                if r["status"] == RecordStatus.CONFIRMED or r["status"] == RecordStatus.DISCARDED:
-                    self.db.set_word_mature(r["word_id"], 100)
-
-        if self.db is not None:
-            self.db.commit_changes()
-
-        exporter.close_file()
-
-        self.entryList.setCurrentRow(record_count - 1)  # set selection to last
-        self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
-        self.editor_block_signals(False)  # <---------------- editor signals unblocked ----------------
-        self.saveBar.setVisible(False)
-        self.saveBar.setValue(len(self.records))
-
-        self.is_saving = False
-        self.has_changed = False
-
-        return "\n" + save_file
-
-    def cur_idx(self):
-        """
-        Helper function to get current index.
-        :return: current index
-        """
-        return self.entryList.currentRow()
-
-    def cur_record(self):
-        """
-        Helper function to get current record entry.
-        :return: current record
-        """
-        return self.records[self.cur_idx()]
 
     # -------------------------------- UI Helper Functions --------------------------------
 
@@ -340,7 +135,15 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.editor_block_signals(False)
             self.set_gui_enabled(False)
 
-        self.update_progress_bar()
+        self.unreadBar.setMaximum(self.data.get_count())
+        self.unreadBar.setValue(self.data.counts(UNVIEWED) + self.data.counts(TOPROCESS))
+        self.unreadBar.setToolTip("%d unread" % self.unreadBar.value())
+        self.confirmedBar.setMaximum(self.data.get_count())
+        self.confirmedBar.setValue(self.data.get_count(CONFIRMED))
+        self.confirmedBar.setToolTip("%d confirmed" % self.confirmedBar.value())
+        self.discardBar.setMaximum(self.data.get_count())
+        self.discardBar.setValue(self.data.get_count(DISCARDED))
+        self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
 
     def confirm_before_action(self, action_name):
         """
@@ -357,66 +160,20 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         else:
             return True
 
-    def set_record_status(self, idx, status):
+    def cur_idx(self):
         """
-        Set UI and change record entry.
-        :param idx: index of record entry
-        :param status: one of RecordStatus
-        :return:
+        Helper function to get current index.
+        :return: current index
         """
+        return self.entryList.currentRow()
 
-        if self.records[idx]["status"] == status:  # nothing needs to be done
-            return
-
-        if status == RecordStatus.CONFIRMED or status == RecordStatus.DISCARDED:
-            self.has_changed = True
-
-        f = self.entryList.font()
-
-        if status == RecordStatus.TOPROCESS:  # set TOPROCESS entry to normal form and update counts
-
-            f.setItalic(False)
-            f.setStrikeOut(False)
-
-            if self.records[idx]["status"] == RecordStatus.CONFIRMED:
-                self.confirmed_count -= 1
-            elif self.records[idx]["status"] == RecordStatus.DISCARDED:
-                self.discard_count -= 1
-
-        elif status == RecordStatus.CONFIRMED:  # set CONFIRMED entry to italic and update counts
-
-            f.setItalic(True)
-            f.setStrikeOut(False)
-
-            self.confirmed_count += 1
-
-        elif status == RecordStatus.DISCARDED:  # strike out DISCARDED entry and update counts
-
-            f.setItalic(False)
-            f.setStrikeOut(True)
-
-            self.discard_count += 1
-
-        self.entryList.item(idx).setFont(f)
-        self.update_progress_bar()
-
-        self.records[idx]["status"] = status  # modify record
-
-    def update_progress_bar(self):
+    def cur_record(self):
         """
-        Helper functions to update statistic bars.
-        :return: None
+        Helper function to get current record entry.
+        :return: current record
         """
-        record_count = len(self.records)
-        self.unreadBar.setMaximum(record_count)
-        self.unreadBar.setValue(record_count - (self.confirmed_count + self.discard_count))
-        self.unreadBar.setToolTip("%d unread" % self.unreadBar.value())
-        self.confirmedBar.setMaximum(record_count)
-        self.confirmedBar.setValue(self.confirmed_count)
-        self.confirmedBar.setToolTip("%d confirmed" % self.confirmedBar.value())
-        self.discardBar.setMaximum(record_count)
-        self.discardBar.setValue(self.discard_count)
-        self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
+        return self.records[self.cur_idx()]
+
 
     def editor_load_entry(self, idx, forced_query=False):
         """
@@ -477,30 +234,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     def add_new_single_entry(self, subject="", usage="", source_enabled=False,
                              source='<div align="right" style="font-size:12px"></div>'):
-        new_entry = {
-            "status": RecordStatus.UNVIEWED,
-            "word_id": None,
-            "subject": subject,
-            "pron": "Unknown",
-            "para": "",
-            "ext": "",
-            "usage": usage,
-            "source": source,
-            "source_enabled": source_enabled,
-            "hint": "",
-            "img": None,  # no image
-            "freq": 0,
-            "card": "R",
-            "tips": ""
-        }
+        # TODO
+        # self.entryList.insertItem(cur_idx + 1, subject)
+        # self.update_ui_after_record_count_changed()  # placed before editor_load_entry() for source to set correctly
 
-        cur_idx = self.cur_idx()
-
-        self.records.insert(cur_idx + 1, new_entry)
-        self.entryList.insertItem(cur_idx + 1, subject)
-        self.update_ui_after_record_count_changed()  # placed before editor_load_entry() for source to set correctly
         self.entryList.setCurrentRow(cur_idx + 1)  # will trigger editor_load_entry()
-
         self.subject.setFocus()
 
     def move_to_next(self):
@@ -531,6 +269,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         """
         for component in self.editor_components:
             component.blockSignals(value)
+
+    @pyqtSlot(int)
+    def update_ui_during_saving(self, index):
+        self.saveBar.setValue(i)
+        self.entryList.setCurrentRow(i)
+        QtCore.QCoreApplication.processEvents()
 
     # -------------------------------- UI Signal Handlers --------------------------------
 
@@ -644,7 +388,27 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                              QtWidgets.QMessageBox.Cancel)
 
         if ret == QtWidgets.QMessageBox.Yes:
-            save_file = self.save_all()
+
+
+            self.set_gui_enabled(False)  # ---------------- GUI disabled ---------------->
+            self.editor_block_signals(True)  # ---------------- editor signals blocked ---------------->
+            self.saveBar.setVisible(True)
+            self.saveBar.setMaximum(len(self.records))
+
+            self.is_saving = True
+
+            save_file = self.save_all()  # TODO
+
+            self.entryList.setCurrentRow(record_count - 1)  # set selection to last
+            self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
+            self.editor_block_signals(False)  # <---------------- editor signals unblocked ----------------
+            self.saveBar.setVisible(False)
+            self.saveBar.setValue(len(self.records))
+
+            self.is_saving = False
+            self.has_changed = False
+
+
             QtWidgets.QMessageBox.information(self, "Success",
                                               "Saved %d entries. Discard %d entries. %d entries unchanged.\n\n" \
                                               "Saved to %s" % (
@@ -681,12 +445,46 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @pyqtSlot()
     def load_kindle_clicked(self):
         if self.confirm_before_action("reload database"):
-            self.reload_kindle_data()
+            if os.path.isfile(self.db_file):
+
+                # TODO
+            else:
+                msg_box = QtWidgets.QMessageBox()
+                msg_box.setWindowTitle("Error")
+                msg_box.setText("Failed to find Kindle DB file. Please make sure Kindle has connected.")
+                msg_box.setIcon(QtWidgets.QMessageBox.Warning)
+                msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+                msg_box.exec_()
+                return
 
     @pyqtSlot()
     def load_csv_clicked(self):
         if self.confirm_before_action("reload database"):
-            self.reload_csv_data()
+            options = QFileDialog.Options()
+            options |= QFileDialog.DontUseNativeDialog
+            csv_file, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                      "CSV Files (*.csv);;All Files (*)", options=options)
+            if csv_file:
+
+                # TODO
+
+    def load_records(self) -> None:# TODO
+        self.entryList.blockSignals(True)  # ---------------- entry list signals blocked ---------------->
+
+        # Initialize additional fields and add to list
+        for r in self.records:
+            # TODO
+            self.entryList.addItem(r["subject"])  # signals has been blocked
+
+        self.has_changed = False
+
+        self.entryList.blockSignals(False)  # <---------------- entry list signals unblocked ----------------
+
+        self.update_ui_after_record_count_changed()  # need to before loading first entry to make gui enabled
+
+        # Setup initial entry, must be after necessary initialization
+        if len(self.records) > 0:
+            self.entryList.setCurrentRow(0)  # will trigger editor_load_entry()
 
     @pyqtSlot()
     def freq_bar_double_clicked(self, event):
@@ -718,14 +516,67 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         else:
             self.add_new_single_entry()
 
+    @pyqtSlot()
     def clear_list_clicked(self):
         if self.confirm_before_action("clear list manually"):
             self.clear_records()
+            self.entryList.blockSignals(True)
+            self.entryList.clear()
+            QtCore.QCoreApplication.processEvents()
+            self.entryList.blockSignals(False)
+
+            self.update_ui_after_record_count_changed()
 
     def card_type_changed(self):
         self.cur_record()["card"] = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
                                                 "S" if self.checkS.isChecked() else "",
                                                 "D" if self.checkD.isChecked() else "")
+
+    def (self, idx, status):  # TODO: update list font
+        """
+        Set UI and change record entry.
+        :param idx: index of record entry
+        :param status: one of RecordStatus
+        :return:
+        """
+
+        if self.records[idx]["status"] == status:  # nothing needs to be done
+            return
+
+        if status == RecordStatus.CONFIRMED or status == RecordStatus.DISCARDED:
+            self.has_changed = True
+
+        f = self.entryList.font()
+
+        if status == RecordStatus.TOPROCESS:  # set TOPROCESS entry to normal form and update counts
+
+            f.setItalic(False)
+            f.setStrikeOut(False)
+
+            if self.records[idx]["status"] == RecordStatus.CONFIRMED:
+                self.confirmed_count -= 1
+            elif self.records[idx]["status"] == RecordStatus.DISCARDED:
+                self.discard_count -= 1
+
+        elif status == RecordStatus.CONFIRMED:  # set CONFIRMED entry to italic and update counts
+
+            f.setItalic(True)
+            f.setStrikeOut(False)
+
+            self.confirmed_count += 1
+
+        elif status == RecordStatus.DISCARDED:  # strike out DISCARDED entry and update counts
+
+            f.setItalic(False)
+            f.setStrikeOut(True)
+
+            self.discard_count += 1
+
+        self.entryList.item(idx).setFont(f)
+        self.update_ui_after_record_count_changed()
+
+        self.records[idx]["status"] = status  # modify record
+
 
     @pyqtSlot()
     def query_collins_clicked(self):

@@ -18,18 +18,11 @@ ios_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWe
 collins_url = u"https://www.collinsdictionary.com/dictionary/english/%s"
 
 collins_post_js = """
-$('iframe').remove()
-$('.topslot_container').remove()
-$('.cB-hook').remove()
-$('#videos').remove()
-$('.socialButtons').remove()
-$('.tabsNavigation').remove()
-$('.res_cell_right').remove()
-$('.btmslot_a-container').remove()
-$('.exercise').remove()
-$('.mpuslot_b-container').remove()
-$('._hj-f5b2a1eb-9b07_feedback_minimized_label').remove()
-$('.share-button').remove()
+let selectors = ['iframe', '.topslot_container', '.cB-hook', '#videos', '.socialButtons', '.tabsNavigation',
+                 '.res_cell_right', '.btmslot_a-container', '.exercise', '.mpuslot_b-container',
+                 '._hj-f5b2a1eb-9b07_feedback_minimized_label', '.share-button', '.ac_leftslot_a',
+                 '.new-from-collins'];
+selectors.forEach(selector => document.querySelectorAll(selector).forEach(el => el.remove()));
 """
 
 
