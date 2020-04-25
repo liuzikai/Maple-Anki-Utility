@@ -77,7 +77,7 @@ class QueryManager(QtCore.QObject):
         self._query_timer.start(self.QUERY_INTERVAL)
 
     @QtCore.pyqtSlot(int)
-    def load_start(self, idx: int):
+    def load_started(self, idx: int):
         self._handle_progress(idx, 0)
         # Moving current worker to self._working_worker is completed before this
 

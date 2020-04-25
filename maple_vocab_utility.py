@@ -15,6 +15,8 @@ SAVE_PATH = "/Users/liuzikai/Desktop"
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
+
+    WEB_QUERY_WORKER_COUNT = 6
     CARD_RD_THRESHOLD = 4
 
     def __init__(self, app, parent=None):
@@ -79,7 +81,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.is_saving = False
 
         # Create WebViews and setup QueryManager
-        # TODO
+        self.query_worker = []
+        self.create_query_workers()
+
+        self.qm = QueryManager(self.WEB_QUERY_WORKER_COUNT)
+        self.qm.start_worker.connect()  # worker, url
+        self.qm.worker_usage.connect()  # finished, working, free
+        self.qm.worker_activated.connect()  # worker, finished
+        self.qm.active_worker_progress.connect()  # active_worker, process
+        self.qm.collins_suggestion_retrieved.connect()  # original_subject, suggestion
+        self.qm.collins_freq_retrieved.connect()  # original_subject, freq, tip
 
         # Setup DataManager and connections
         self.data = DataManager()
@@ -92,21 +103,25 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # Setup initial interface
         self.update_ui_after_record_count_changed()
 
-    # TODO: add QtWebEngineView dynamically
-    def():
-        self.verticalLayout_6.addWidget(self.webLoadingView)
-        self.webView = QtWebEngineWidgets.QWebEngineView(self.widget_8)
-        self.webView.setMinimumSize(QtCore.QSize(600, 0))
-        self.webView.setMaximumSize(QtCore.QSize(600, 16777215))
-        self.webView.setObjectName("webView")
-        self.verticalLayout_6.addWidget(self.webView)
-        self.verticalLayout_2.addWidget(self.widget_8)
+    def create_query_workers(self) -> None:
 
-        self.webView.loadStarted.connect(self.web_load_started)
-        self.webView.loadProgress.connect(self.web_load_progress)
-        self.webView.loadFinished.connect(self.web_load_finished)
-        self.webView.page().profile().setHttpUserAgent(mac_user_agent)
-        self.webView.page().profile().setProperty("X-Frame-Options", "Deny")
+        for i in range(self.WEB_QUERY_WORKER_COUNT):
+            webView = QtWebEngineWidgets.QWebEngineView(self.webViewFrame)
+            webView.setMinimumSize(QtCore.QSize(600, 0))
+            webView.setMaximumSize(QtCore.QSize(600, 16777215))
+            webView.setObjectName("webView_" + str(i))
+            self.webViewVerticalLayout.addWidget(webView)
+            webView.setVisible(False)
+            self.query_worker.append(webView)
+
+            webView.loadStarted.connect(lambda: self.qm.load_started(i))
+            webView.loadProgress.connect(lambda progress: self.qm.load_progress(i, progress))
+            webView.loadFinished.connect(lambda ok: self.qm.load_finished(i, ok))
+
+            webView.page().profile().setHttpUserAgent(self.qm.MAC_USER_AGENT)
+            webView.page().profile().setProperty("X-Frame-Options", "Deny")
+
+    # TODO: create slots
 
     @QtCore.pyqtSlot()
     def update_ui_after_record_count_changed(self):
