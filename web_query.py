@@ -13,6 +13,7 @@ from PyQt5 import QtWebEngineWidgets
 class QueryManager(QtCore.QObject):
 
     start_worker = QtCore.pyqtSignal(int, str)  # worker, url
+    interrupt_worker = QtCore.pyqtSignal(int)  # worker
     worker_progress = QtCore.pyqtSignal(int, int)  # worker, progress
     worker_usage = QtCore.pyqtSignal(int, int, int)  # finished, working, free
 
@@ -46,6 +47,7 @@ class QueryManager(QtCore.QObject):
     """
 
     QUERY_INTERVAL = 5000  # [ms]
+    QUERY_INTERRUPT_TIME = 10000  # [ms]
 
     def __init__(self, worker_count: int):
         super().__init__()
@@ -55,7 +57,8 @@ class QueryManager(QtCore.QObject):
         self._worker = [{
             "subject": "",
             "query": -1,
-            "progress": 0
+            "progress": 0,
+            "forced_stopped": False
         }] * worker_count
 
         self._active_worker = -1
@@ -65,7 +68,13 @@ class QueryManager(QtCore.QObject):
         self._free_workers = deque()
         for i in range(self._worker_count):
             self._free_workers.append(i)
-        self.report_worker_usage()
+
+        self._worker_timer = []
+        for i in range(self._worker_count):
+            timer = QtCore.QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda idx=i: self._worker_timeout(idx))
+            self._worker_timer.append(timer)
 
         self._query_count = {}
         self._pending_queries = deque()  # (subject, query, worker)
@@ -75,6 +84,32 @@ class QueryManager(QtCore.QObject):
         self._query_timer.setSingleShot(False)
         self._query_timer.timeout.connect(self._query_timer_timeout)
         self._query_timer.start(self.QUERY_INTERVAL)
+
+    def reset(self):
+        # Reset all workers
+        for worker in self._working_workers:
+            self._force_stop_worker(worker)
+            # It won't take place immediately since it involves signal. But when it happens, the slot
+            # load_finished won't try to remove it from _working_workers
+        self._finished_workers.clear()
+        self._working_workers.clear()
+        self._free_workers = deque()
+        for i in range(self._worker_count):
+            self._free_workers.append(i)
+        self.report_worker_usage()
+
+        if self._active_worker != -1:
+            self._active_worker = -1
+            self.worker_activated.emit(-1, True)
+
+        # Reset all timer
+        for timer in self._worker_timer:
+            timer.stop()
+
+        # Clear all queries
+        self._query_count.clear()
+        self._pending_queries.clear()
+        self._started_queries.clear()
 
     @QtCore.pyqtSlot(int)
     def load_started(self, idx: int):
@@ -87,21 +122,31 @@ class QueryManager(QtCore.QObject):
 
     @QtCore.pyqtSlot(int, bool)
     def load_finished(self, idx: int, ok: bool):
+        
+        if self._worker[idx]["forced_stopped"]:
+            # When forced stopped, worker position in lists (_working_workers, etc.) must already be handled externally
+            # Also, there is nothing to do with the result
+            self._worker[idx]["forced_stopped"] = False
+            # But this must be set here, rather than at the time calling start_worker.emit, or it may not work since
+            # signals are asynchronous.
+            return
+        
         self._handle_progress(idx, 100)
         self._working_workers.remove(idx)
         self._finished_workers.append(idx)
+        self.report_worker_usage()
 
         sender: QtWebEngineWidgets.QWebEngineView = self.sender()
         if self._worker[idx]["query"] == self.COLLINS:
             # Parse suggestion
             suggestion = self._get_word_from_collins_url(sender.page().url().url())
-            if suggestion is not None and suggestion != self._worker[idx]["subject"]:
-                self.collins_suggestion_retrieved.emit(self._worker[idx]["subject"], suggestion)
+            subject = self._worker[idx]["subject"]
+            if suggestion is not None and suggestion != subject:
+                self.collins_suggestion_retrieved.emit(subject, suggestion)
             # Retrieve freq and tip
             sender.page().runJavaScript("document.documentElement.outerHTML",
                                         # Pass subject string instead of idx in this async case
-                                        lambda html: self._collins_web_to_html_callback(self._worker[idx]["subject"],
-                                                                                        html))
+                                        lambda html, s=subject: self._collins_web_to_html_callback(s, html))
             # Clean up page
             sender.page().runJavaScript(self.COLLINS_POST_JS)
 
@@ -142,10 +187,9 @@ class QueryManager(QtCore.QObject):
             self.report_worker_usage()
 
             self._active_worker = worker  # set before start_worker for proper progress update
-
-            self.start_worker.emit(worker, self.URLS[query] % subject)
-
             self.worker_activated.emit(worker, False)
+
+            self._start_worker(worker, subject, query)
 
             return
 
@@ -156,17 +200,21 @@ class QueryManager(QtCore.QObject):
         self._pending_queries.appendleft((s, q))
 
         if worker in self._working_workers:
-            self._working_workers.remove(worker)
-        elif worker in self._finished_workers:
+            self._force_stop_worker(worker)
+            # It won't take place immediately since it involves signal. But when it happens, the slot load_finished
+            # won't try to remove it from _working_workers
+
+            # Leave it in _working_workers
+        else:
             self._finished_workers.remove(worker)
-        self._working_workers.append(worker)
+            self._working_workers.append(worker)
         self.report_worker_usage()
 
         self._active_worker = worker  # set before start_worker for proper progress update
-
-        self.start_worker.emit(worker, self.URLS[query] % subject)
-
         self.worker_activated.emit(worker, False)
+
+        self._start_worker(worker, subject, query)
+        # It's safe even if the worker hasn't actually stopped yet, since signals are sent in the order they emitted
 
     def discard_by_subject(self, subject):
         for query in range(4):
@@ -175,12 +223,57 @@ class QueryManager(QtCore.QObject):
                 c -= 1
                 self._query_count[(subject, query)] = c
                 if c == 0:  # only actually discard query when duplication count goes to 0
-                    for q in self._started_queries:
-                        if q[0] == subject and q[1] == query:
-                            self._started_queries.remove(q)
-                    for q in self._pending_queries:
-                        if q[0] == subject and q[1] == query:
-                            self._pending_queries.remove(q)
+
+                    # Search in _started queries
+                    to_remove = self._find_in_started_queries(subject, query)
+                    if to_remove is not None:
+                        worker = to_remove[2]
+                        self._started_queries.remove(to_remove)
+                        if worker in self._working_workers:
+                            self._force_stop_worker(worker)
+                            # It won't take place immediately since it involves signal. But when it happens, the slot
+                            # load_finished won't try to remove it from _working_workers
+                            self._working_workers.remove(worker)
+                        else:
+                            self._finished_workers.remove(worker)
+                        self._free_workers.append(worker)
+                        self.report_worker_usage()
+
+                    # Search in started _pending_queries
+                    to_remove = self._find_in_pending_queries(subject, query)
+                    if to_remove is not None:
+                        self._pending_queries.remove(to_remove)
+
+    def _force_stop_worker(self, idx: int) -> None:
+        """
+        Force a working worker to stop. When it stopped, slot load_finished will be triggered but do nothing. Worker's
+        location in worker lists (_working_worker, etc.) must be managed manually (this function will do nothing about
+        this.)
+        :param idx:
+        :return:
+        """
+        assert idx in self._working_workers, "Worker %d is not working" % idx
+        self._worker[idx]["forced_stopped"] = True
+        self.interrupt_worker.emit(idx)
+        if idx == self._active_worker:
+            self._active_worker = -1
+            self.worker_activated.emit(-1, True)
+
+    def _find_in_started_queries(self, subject: str, query: int) -> (str, int, int):
+        ret = None
+        for q in self._started_queries:
+            if q[0] == subject and q[1] == query:
+                ret = q
+                break
+        return ret
+
+    def _find_in_pending_queries(self, subject: str, query: int) -> (str, int):
+        ret = None
+        for q in self._pending_queries:
+            if q[0] == subject and q[1] == query:
+                ret = q
+                break
+        return ret
 
     def _handle_progress(self, idx: int, progress: int):
         self._worker[idx]["progress"] = progress
@@ -214,7 +307,6 @@ class QueryManager(QtCore.QObject):
             return None
 
     def _collins_web_to_html_callback(self, subject: str, html: str):
-
         (freq, tips) = self._parse_collins_freq(html)
         self.collins_freq_retrieved.emit(subject, freq, tips)
 
@@ -225,7 +317,19 @@ class QueryManager(QtCore.QObject):
             subject, query = self._pending_queries.popleft()
             self._working_workers.append(worker)
             self.report_worker_usage()
-            self.start_worker.emit(worker, self.URLS[query] % subject)
+            self._start_worker(worker, subject, query)
+
+    @QtCore.pyqtSlot(int)
+    def _worker_timeout(self, idx: int):
+        if idx in self._working_workers:  # if still working
+            self.interrupt_worker.emit(idx)  # stop normally, not force stop
+
+    def _start_worker(self, idx: int, subject: str, query: int) -> None:
+        self._worker[idx]["subject"] = subject
+        self._worker[idx]["query"] = query
+        self._started_queries.append((subject, query, idx))
+        self.start_worker.emit(idx, self.URLS[query] % subject)
+        self._worker_timer[idx].start(self.QUERY_INTERRUPT_TIME)
 
     def report_worker_usage(self):
         self.worker_usage.emit(len(self._finished_workers), len(self._working_workers), len(self._free_workers))

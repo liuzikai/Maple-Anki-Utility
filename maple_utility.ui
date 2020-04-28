@@ -763,23 +763,16 @@ p, li { white-space: pre-wrap; }
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_7">
           <item>
-           <widget class="QCheckBox" name="autoQuery">
+           <widget class="QLabel" name="queryStatusLabel">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+             <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
-            <property name="text">
-             <string>Auto Query</string>
+            <property name="toolTip">
+             <string>Finished/Working/Free</string>
             </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="queryStatusLabel">
             <property name="text">
              <string>0/0/0</string>
             </property>
@@ -855,22 +848,6 @@ p, li { white-space: pre-wrap; }
              </sizepolicy>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_7">
-             <item>
-              <widget class="QLabel" name="webLoadingLabel">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="text">
-                <string>Loading...</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-              </widget>
-             </item>
              <item>
               <widget class="QProgressBar" name="webLoadingBar">
                <property name="value">

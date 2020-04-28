@@ -49,6 +49,13 @@ class DataManager(QtCore.QObject):
     def get(self, idx: int) -> dict:
         return self._records[idx]
 
+    def get_by_subject(self, subject: str) -> [dict]:
+        ret = []
+        for r in self._records:
+            if r["subject"] == subject:
+                ret.append(r)
+        return ret
+
     def count(self, status=None) -> int:
         if status is None:
             return len(self._records)
@@ -121,6 +128,7 @@ class DataManager(QtCore.QObject):
             r["tips"] = ""
             r["source_enabled"] = (r["source"] != "")
             r["usage"] = r["usage"].replace(r["subject"], u"<b>%s</b>" % r["subject"])
+            r["suggestion"] = None
 
             self.record_inserted.emit(i, True)
 
