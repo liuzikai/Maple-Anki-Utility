@@ -46,6 +46,7 @@ class QueryManager(QtCore.QObject):
     selectors.forEach(selector => document.querySelectorAll(selector).forEach(el => el.remove()));
     """
 
+    DELAY_REQUEST_TIME = 3000  # [ms]
     QUERY_INTERVAL = 5000  # [ms]
     QUERY_INTERRUPT_TIME = 10000  # [ms]
 
@@ -85,6 +86,11 @@ class QueryManager(QtCore.QObject):
         self._query_timer.timeout.connect(self._query_timer_timeout)
         self._query_timer.start(self.QUERY_INTERVAL)
 
+        self._delay_request = None
+        self._delay_request_timer = QtCore.QTimer()
+        self._delay_request_timer.setSingleShot(True)
+        self._delay_request_timer.timeout.connect(self._delay_request_timeout)
+
     def reset(self):
         # Reset all workers
         for worker in self._working_workers:
@@ -102,14 +108,16 @@ class QueryManager(QtCore.QObject):
             self._active_worker = -1
             self.worker_activated.emit(-1, True)
 
-        # Reset all timer
+        # Reset all timer, except _query_timer
         for timer in self._worker_timer:
             timer.stop()
+        self._delay_request_timer.stop()
 
         # Clear all queries
         self._query_count.clear()
         self._pending_queries.clear()
         self._started_queries.clear()
+        self._delay_request = None
 
     @QtCore.pyqtSlot(int)
     def load_started(self, idx: int):
@@ -130,7 +138,10 @@ class QueryManager(QtCore.QObject):
             # But this must be set here, rather than at the time calling start_worker.emit, or it may not work since
             # signals are asynchronous.
             return
-        
+        if idx not in self._working_workers:
+            # Cause by accessing new url within webView itself
+            return
+
         self._handle_progress(idx, 100)
         self._working_workers.remove(idx)
         self._finished_workers.append(idx)
@@ -215,6 +226,21 @@ class QueryManager(QtCore.QObject):
 
         self._start_worker(worker, subject, query)
         # It's safe even if the worker hasn't actually stopped yet, since signals are sent in the order they emitted
+
+    def delay_request(self, subject: str, query: int):
+        """
+        If the query is already started, request immediately. If not, delay for DELAY_REQUEST_TIME before actually
+        request or cancel if discarded during the delay time
+        :param subject:
+        :param query:
+        :return:
+        """
+        if self._find_in_started_queries(subject, query):
+            self.request(subject, query)
+        else:
+            self._delay_request = (subject, query)
+            # If there is already a delay request, simply overwrite it and reset timer as follows
+            self._delay_request_timer.start(self.DELAY_REQUEST_TIME)
 
     def discard_by_subject(self, subject):
         for query in range(4):
@@ -333,3 +359,9 @@ class QueryManager(QtCore.QObject):
 
     def report_worker_usage(self):
         self.worker_usage.emit(len(self._finished_workers), len(self._working_workers), len(self._free_workers))
+
+    @QtCore.pyqtSlot()
+    def _delay_request_timeout(self):
+        if self._delay_request is not None:
+            self.request(self._delay_request[0], self._delay_request[1])
+            self._delay_request = None

@@ -96,6 +96,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         # Setup DataManager and connections
         self.data = DataManager()
         self.data.record_status_changed.connect(self.handle_record_status_changed)  # index, old_status, new_status
+        self.data.record_batch_load_finished.connect(self.handle_record_batch_load_finished)
         self.data.record_cleared.connect(self.handle_record_clear)
         self.data.record_inserted.connect(self.handle_record_insertion)  # index, batch_loading(True)/add_single(False)
         self.data.record_count_changed.connect(self.update_ui_after_record_count_changed)
@@ -182,6 +183,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.subject.setFocus()
         else:
             self.qm.queue(self.data.get(idx)["subject"], self.qm.COLLINS)
+            self.qm.queue(self.data.get(idx)["subject"], self.qm.GOOGLE_IMAGE)
 
     @QtCore.pyqtSlot()
     def update_ui_after_record_count_changed(self):
@@ -209,6 +211,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discardBar.setMaximum(self.data.count())
         self.discardBar.setValue(self.data.count(self.data.DISCARDED))
         self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
+
+    @QtCore.pyqtSlot()
+    def handle_record_batch_load_finished(self):
+        if self.data.count() > 0:
+            self.entryList.setCurrentRow(0)
+            self.paraphrase.setFocus()
 
     @QtCore.pyqtSlot()
     def handle_record_clear(self):
@@ -375,7 +383,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 if r["status"] == self.data.UNVIEWED:
                     self.pronSamantha.click()  # including toggling and first-time pronouncing
                     self.data.set_status(self.cur_idx(), self.data.TOPROCESS)
-                self.qm.request(r["subject"], self.qm.COLLINS)
+                self.qm.delay_request(r["subject"], self.qm.COLLINS)
 
     @QtCore.pyqtSlot()
     def pron_clicked(self):

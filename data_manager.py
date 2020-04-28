@@ -30,6 +30,7 @@ class DataManager(QtCore.QObject):
     record_status_changed = QtCore.pyqtSignal(int, int, int)  # index, old_status, new_status
     record_cleared = QtCore.pyqtSignal()
     record_inserted = QtCore.pyqtSignal(int, bool)  # index, batch_loading(True)/add_single(False)
+    record_batch_load_finished = QtCore.pyqtSignal()
     record_count_changed = QtCore.pyqtSignal()
     save_progress = QtCore.pyqtSignal(int)  # index to highlight
 
@@ -136,6 +137,7 @@ class DataManager(QtCore.QObject):
         self._counts[self.TOPROCESS] = self._counts[self.CONFIRMED] = self._counts[self.DISCARDED] = 0
 
         self.record_count_changed.emit()
+        self.record_batch_load_finished.emit()
 
     def save_all(self, output_path: str) -> str:
         """
