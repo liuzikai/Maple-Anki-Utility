@@ -1,22 +1,20 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
 from pyquery import PyQuery
 from data_source import *
 from data_export import *
 from PyQt5 import QtCore
+from html2text import html2text
 
 
 def html_extract(h: str) -> str:
-    if len(h.strip()) == 0:
-        return ""
-    pq = PyQuery(h)
-    if pq:
-        p = pq("p")
-        if p:
-            return p.html().strip()
-    return h
+    text = html2text(h)
+    text = text.replace("\n\n", "\n")
+    if text.endswith("\n"):
+        text = text[:-1]
+    text = text.replace("\n", "<br>")
+    return text
 
 
 class DataManager(QtCore.QObject):
@@ -241,4 +239,5 @@ class DataManager(QtCore.QObject):
         self._records.insert(idx, new_entry)
 
         self.record_inserted.emit(idx, False)
+        self._counts[self.UNVIEWED] += 1
         self.record_count_changed.emit()
