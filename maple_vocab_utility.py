@@ -88,6 +88,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.qm.worker_usage.connect(self.handle_worker_usage)  # finished, working, free
         # self.qm.worker_progress.connect()  # worker, progress
         self.qm.worker_activated.connect(self.activate_query_worker)  # worker, finished
+        self.qm.delay_request_activated.connect(self.handle_delay_request_activated)  # subject, query
         self.qm.active_worker_progress.connect(self.handle_active_worker_progress)  # active_worker, process
         self.qm.collins_suggestion_retrieved.connect(self.handle_collins_suggestion)  # original_subject, suggestion
         self.qm.collins_freq_retrieved.connect(self.set_word_freq)  # original_subject, freq, tip
@@ -108,7 +109,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     # ================================ Web Query Related ================================
 
     def create_query_workers(self) -> None:
-
         for i in range(self.WEB_QUERY_WORKER_COUNT):
             wv = QtWebEngineWidgets.QWebEngineView(self.webViewFrame)
             wv.setMinimumSize(QtCore.QSize(600, 0))
@@ -124,16 +124,20 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
             wv.page().profile().setHttpUserAgent(self.qm.MAC_USER_AGENT)
             wv.page().profile().setProperty("X-Frame-Options", "Deny")
+            # Prevent webView from grabbing focus when calling load() or stop()
+            wv.settings().setAttribute(wv.settings().FocusOnNavigationEnabled, False)
 
     @QtCore.pyqtSlot(int, str)
     def start_query_worker(self, idx: int, url: str):
         self.query_worker[idx].load(QtCore.QUrl(url))
         print("Worker %d starts on %s" % (idx, url))
+        QtCore.QCoreApplication.processEvents()
 
     @QtCore.pyqtSlot(int)
     def interrupt_query_worker(self, idx: int):
         self.query_worker[idx].stop()
         print("Worker %d interrupted" % idx)
+        QtCore.QCoreApplication.processEvents()
 
     @QtCore.pyqtSlot(int, int, int)
     def handle_worker_usage(self, finished: int, working: int, free: int):
@@ -148,6 +152,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @QtCore.pyqtSlot(int, int)
     def handle_active_worker_progress(self, active_worker: int, progress: int):
         self.webLoadingBar.setValue(progress)
+
+    @QtCore.pyqtSlot(str, int)
+    def handle_delay_request_activated(self, subject: str, query: int):
+        if query == self.qm.COLLINS:
+            self.qm.queue(subject, self.qm.GOOGLE_IMAGE, front=True)
 
     @QtCore.pyqtSlot(str, int, str)
     def set_word_freq(self, subject: str, freq: int, tips: str):
@@ -183,7 +192,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.subject.setFocus()
         else:
             self.qm.queue(self.data.get(idx)["subject"], self.qm.COLLINS)
-            self.qm.queue(self.data.get(idx)["subject"], self.qm.GOOGLE_IMAGE)
 
     @QtCore.pyqtSlot()
     def update_ui_after_record_count_changed(self):
@@ -308,6 +316,8 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         if suggestion is not None and suggestion != r["subject"]:
             self.subjectSuggest.setText("Suggest: " + suggestion)
             self.subjectSuggest.setVisible(True)
+        else:
+            self.subjectSuggest.setVisible(False)
 
         self.editor_block_signals(False)  # <-------- main editor signals unblocked --------
 

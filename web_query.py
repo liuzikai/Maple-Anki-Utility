@@ -11,7 +11,6 @@ from PyQt5 import QtWebEngineWidgets
 
 
 class QueryManager(QtCore.QObject):
-
     start_worker = QtCore.pyqtSignal(int, str)  # worker, url
     interrupt_worker = QtCore.pyqtSignal(int)  # worker
     worker_progress = QtCore.pyqtSignal(int, int)  # worker, progress
@@ -19,6 +18,8 @@ class QueryManager(QtCore.QObject):
 
     worker_activated = QtCore.pyqtSignal(int, bool)  # worker, finished
     active_worker_progress = QtCore.pyqtSignal(int, int)  # active_worker, process
+
+    delay_request_activated = QtCore.pyqtSignal(str, int)  # subject, query
 
     collins_suggestion_retrieved = QtCore.pyqtSignal(str, str)  # original_subject, suggestion
     collins_freq_retrieved = QtCore.pyqtSignal(str, int, str)  # original_subject, freq, tip
@@ -55,12 +56,15 @@ class QueryManager(QtCore.QObject):
 
         self._worker_count = worker_count
 
-        self._worker = [{
-            "subject": "",
-            "query": -1,
-            "progress": 0,
-            "forced_stopped": False
-        }] * worker_count
+        self._worker = []
+        # Notice: do not use [{...}] * worker_count, since dict is mutable
+        for i in range(worker_count):
+            self._worker.append({
+                "subject": "",
+                "query": -1,
+                "progress": 0,
+                "forced_stopped": False
+            })
 
         self._active_worker = -1
 
@@ -130,7 +134,7 @@ class QueryManager(QtCore.QObject):
 
     @QtCore.pyqtSlot(int, bool)
     def load_finished(self, idx: int, ok: bool):
-        
+
         if self._worker[idx]["forced_stopped"]:
             # When forced stopped, worker position in lists (_working_workers, etc.) must already be handled externally
             # Also, there is nothing to do with the result
@@ -158,16 +162,20 @@ class QueryManager(QtCore.QObject):
             sender.page().runJavaScript("document.documentElement.outerHTML",
                                         # Pass subject string instead of idx in this async case
                                         lambda html, s=subject: self._collins_web_to_html_callback(s, html))
+            QtCore.QCoreApplication.processEvents()
             # Clean up page
             sender.page().runJavaScript(self.COLLINS_POST_JS)
 
-    def queue(self, subject: str, query: int):
+    def queue(self, subject: str, query: int, front: bool = False):
         c = self._query_count.get((subject, query))
         if c is not None and c > 0:  # have queued
             self._query_count[(subject, query)] = c + 1  # only increment counter
         else:
             self._query_count[(subject, query)] = 1
-            self._pending_queries.append((subject, query))
+            if front:
+                self._pending_queries.appendleft((subject, query))
+            else:
+                self._pending_queries.append((subject, query))
 
     def request(self, subject: str, query: int):
         # Search in _started_queries
@@ -237,10 +245,11 @@ class QueryManager(QtCore.QObject):
         """
         if self._find_in_started_queries(subject, query):
             self.request(subject, query)
-        else:
-            self._delay_request = (subject, query)
-            # If there is already a delay request, simply overwrite it and reset timer as follows
-            self._delay_request_timer.start(self.DELAY_REQUEST_TIME)
+            # Still start the _delay_request_timer for delay_request_activated signal
+
+        self._delay_request = (subject, query)
+        # If there is already a delay request, simply overwrite it and reset timer as follows
+        self._delay_request_timer.start(self.DELAY_REQUEST_TIME)
 
     def discard_by_subject(self, subject):
         for query in range(4):
@@ -364,4 +373,5 @@ class QueryManager(QtCore.QObject):
     def _delay_request_timeout(self):
         if self._delay_request is not None:
             self.request(self._delay_request[0], self._delay_request[1])
+            self.delay_request_activated.emit(self._delay_request[0], self._delay_request[1])
             self._delay_request = None
