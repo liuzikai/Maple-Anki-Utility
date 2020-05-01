@@ -1,20 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from pyquery import PyQuery
 from data_source import *
 from data_export import *
+from html_cleaner import *
 from PyQt5 import QtCore
-from html2text import html2text
-
-
-def html_extract(h: str) -> str:
-    text = html2text(h)
-    text = text.replace("\n\n", "\n")
-    if text.endswith("\n"):
-        text = text[:-1]
-    text = text.replace("\n", "<br>")
-    return text
 
 
 class DataManager(QtCore.QObject):
@@ -160,11 +150,11 @@ class DataManager(QtCore.QObject):
             # Generate data
             if r["status"] == self.CONFIRMED:
 
-                example = html_extract(r["usage"])
+                example = clean_html(r["usage"])
                 if r["source_enabled"] and r["source"] != "":
-                    example += "<br>" + '<div align="right">' + html_extract(r["source"]) + '</div>'
+                    example += "<br>" + '<div align="right" style="font-size:12px">' + clean_html(r["source"]) + '</div>'
                 mp3 = exporter.generate_media(r["subject"], r["pron"])
-                para = html_extract(r["para"])
+                para = clean_html(r["para"])
                 if r["img"]:
                     img_file = exporter.new_random_filename("png")
                     r["img"].save("%s/%s" % (exporter.media_path, img_file))
@@ -172,7 +162,7 @@ class DataManager(QtCore.QObject):
                 exporter.write_entry(r["subject"],
                                      "[sound:%s]" % mp3,
                                      para,
-                                     html_extract(r["ext"]),
+                                     clean_html(r["ext"]),
                                      example,
                                      r["hint"],
                                      r["freq"],
