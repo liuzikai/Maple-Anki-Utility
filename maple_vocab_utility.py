@@ -345,7 +345,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
                 if (widget is self.subject) or (widget is self.paraphrase and self.paraphrase.toPlainText() == ""):
                     self.data.set_status(self.cur_idx(), self.data.UNVIEWED)
-                    self.selected_changed()
+                    self.selected_changed(query_immediately=True)
                     return True
             elif key == QtCore.Qt.Key_B and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + B
                 if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
@@ -384,7 +384,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.move_to_next()
 
     @QtCore.pyqtSlot()
-    def selected_changed(self):
+    def selected_changed(self, query_immediately: bool = False):
         self.editor_load_entry(self.cur_idx())
 
         r = self.cur_record()
@@ -393,7 +393,11 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                 if r["status"] == self.data.UNVIEWED:
                     self.pronSamantha.click()  # including toggling and first-time pronouncing
                     self.data.set_status(self.cur_idx(), self.data.TOPROCESS)
-                self.qm.delay_request(r["subject"], self.qm.COLLINS)
+                if not query_immediately:
+                    self.qm.delay_request(r["subject"], self.qm.COLLINS)
+                else:
+                    self.qm.request(r["subject"], self.qm.COLLINS)
+                    self.handle_delay_request_activated(r["subject"], self.qm.COLLINS)
 
     @QtCore.pyqtSlot()
     def pron_clicked(self):
