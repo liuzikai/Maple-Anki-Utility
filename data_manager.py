@@ -204,6 +204,8 @@ class DataManager(QtCore.QObject):
         self._records[idx]["status"] = status
         self._counts[status] += 1
 
+        # TODO: output result and commit changes to data source immediately
+
         self.record_status_changed.emit(idx, old_status, status)
         self.record_count_changed.emit()
 
