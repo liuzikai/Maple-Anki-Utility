@@ -1,13 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import requests
-
-from pyquery import PyQuery as pq
 from collections import deque
 
 from PyQt5 import QtCore
 from PyQt5 import QtWebEngineWidgets
+from pyquery import PyQuery as pq
 
 
 class QueryManager(QtCore.QObject):

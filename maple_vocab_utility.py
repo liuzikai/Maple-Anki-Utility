@@ -45,7 +45,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.source.textChanged.connect(self.source_changed)
         self.source.installEventFilter(self)
         self.hint.textChanged.connect(self.hint_changed)
-        self.saveAllButton.clicked.connect(self.save_all_clicked)
         # These shortcuts are global, while the eventFilter needs to be connected to widgets manually
         self.next_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
         self.next_shortcut.activated.connect(self.confirm_clicked)
@@ -64,7 +63,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.loadCSV.clicked.connect(self.load_csv_clicked)
         self.newEntry.clicked.connect(self.add_new_entry_clicked)
         self.clearList.clicked.connect(self.clear_list_clicked)
-        self.saveBar.setVisible(False)
         self.checkR.stateChanged.connect(self.card_type_changed)
         self.checkS.stateChanged.connect(self.card_type_changed)
         self.checkD.stateChanged.connect(self.card_type_changed)
@@ -95,13 +93,12 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.qm.report_worker_usage()
 
         # Setup DataManager and connections
-        self.data = DataManager()
+        self.data = DataManager(SAVE_PATH)
         self.data.record_status_changed.connect(self.handle_record_status_changed)  # index, old_status, new_status
         self.data.record_batch_load_finished.connect(self.handle_record_batch_load_finished)
         self.data.record_cleared.connect(self.handle_record_clear)
         self.data.record_inserted.connect(self.handle_record_insertion)  # index, batch_loading(True)/add_single(False)
         self.data.record_count_changed.connect(self.update_ui_after_record_count_changed)
-        self.data.save_progress.connect(self.update_ui_during_saving)
 
         # Setup initial interface
         self.update_ui_after_record_count_changed()
@@ -248,12 +245,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             f.setStrikeOut(True)
         self.entryList.item(idx).setFont(f)
 
-    @QtCore.pyqtSlot(int)
-    def update_ui_during_saving(self, idx: int):
-        self.saveBar.setValue(idx)
-        self.entryList.setCurrentRow(idx)
-        QtCore.QCoreApplication.processEvents()
-
     # ================================ Data Related Helper Functions ================================
 
     def cur_idx(self):
@@ -271,8 +262,10 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         :param action_name: the action to be performed. Will be shown in the dialog box
         :return: True if no changes or user confirmed, False if user canceled.
         """
-        if self.data.has_changed:
-            quit_msg = "Are you sure you want to %s? Unsaved entries will be lost." % action_name
+        if self.data.count(self.data.TOPROCESS) > 0:
+            quit_msg = "Are you sure you want to %s? " \
+                       "Entries that are not confirmed or discarded will be lost. " \
+                       "Confirmed or discarded ones are saved automatically." % action_name
             reply = QtWidgets.QMessageBox.question(self, 'Message',
                                                    quit_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
             return reply == QtWidgets.QMessageBox.Yes
@@ -330,7 +323,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.add_new_entry_clicked()
 
     def set_gui_enabled(self, value):
-        for component in [self.confirmButton, self.discardButton, self.saveAllButton] + self.editor_components:
+        for component in [self.confirmButton, self.discardButton] + self.editor_components:
             component.setEnabled(value)
 
     def editor_block_signals(self, value):
@@ -402,6 +395,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @QtCore.pyqtSlot()
     def pron_clicked(self):
         sender = self.sender()
+        sender: QtWidgets.QRadioButton
         if sender:
             DataExporter.pronounce(self.cur_record()["subject"], sender.text())
             self.cur_record()["pron"] = sender.text()
@@ -447,45 +441,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.cur_record()["hint"] = self.hint.toPlainText()
 
     @QtCore.pyqtSlot()
-    def save_all_clicked(self):
-        confirm_str = "%d confirmed, %d discarded, %d unread.\n\n" \
-                      "Only confirmed ones will be saved. " \
-                      "Confirmed and discarded ones will be marked as mutual on Kindle. " \
-                      "Please make sure kindle is connected. \n\n" \
-                      "Continue to save?" % (
-                          self.data.count(self.data.CONFIRMED), self.data.count(self.data.DISCARDED),
-                          self.data.count(self.data.UNVIEWED) + self.data.count(self.data.TOPROCESS))
-
-        ret = QtWidgets.QMessageBox.question(self, "Confirm", confirm_str, QtWidgets.QMessageBox.Yes,
-                                             QtWidgets.QMessageBox.Cancel)
-
-        if ret == QtWidgets.QMessageBox.Yes:
-            self.set_gui_enabled(False)  # ---------------- GUI disabled ---------------->
-            self.editor_block_signals(True)  # ---------------- editor signals blocked ---------------->
-            self.saveBar.setVisible(True)
-            self.saveBar.setMaximum(self.data.count())
-
-            self.is_saving = True
-
-            filename = self.data.save_all(SAVE_PATH)
-
-            self.entryList.setCurrentRow(self.data.count() - 1)  # set selection to last
-            self.set_gui_enabled(True)  # <---------------- GUI enabled ----------------
-            self.editor_block_signals(False)  # <---------------- editor signals unblocked ----------------
-            self.saveBar.setVisible(False)
-            self.saveBar.setValue(self.data.count())
-
-            self.is_saving = False
-
-            info = "Saved %d entries. Discard %d entries. %d entries unchanged.\n\n" \
-                   "Saved to %s" % (
-                       self.data.count(self.data.CONFIRMED),
-                       self.data.count(self.data.DISCARDED),
-                       self.data.count(self.data.UNVIEWED) + self.data.count(self.data.TOPROCESS),
-                       filename)
-            QtWidgets.QMessageBox.information(self, "Success", info, QtWidgets.QMessageBox.Ok)
-
-    @QtCore.pyqtSlot()
     def image_clicked(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             mine_data = app.clipboard().mimeData()
@@ -498,7 +453,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.query_google_images_clicked()
 
     @QtCore.pyqtSlot()
-    def image_double_clicked(self, event):
+    def image_double_clicked(self):
         self.cur_record()["img"] = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
@@ -534,7 +489,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         msg_box.exec_()
 
     @QtCore.pyqtSlot()
-    def freq_bar_double_clicked(self, event):
+    def freq_bar_double_clicked(self):
         self.query_collins_clicked()
 
     @QtCore.pyqtSlot()

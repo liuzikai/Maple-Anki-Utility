@@ -5,10 +5,10 @@ from data_source import *
 from data_export import *
 from html_cleaner import *
 from PyQt5 import QtCore
+from typing import Optional, Union
 
 
 class DataManager(QtCore.QObject):
-
     UNVIEWED = 0  # not viewed yet
     TOPROCESS = 1  # already viewed at least one (has been pronounced)
     CONFIRMED = 2
@@ -20,20 +20,25 @@ class DataManager(QtCore.QObject):
     record_inserted = QtCore.pyqtSignal(int, bool)  # index, batch_loading(True)/add_single(False)
     record_batch_load_finished = QtCore.pyqtSignal()
     record_count_changed = QtCore.pyqtSignal()
-    save_progress = QtCore.pyqtSignal(int)  # index to highlight
 
-    def __init__(self):
+    def __init__(self, output_path: str):
 
         super().__init__()
 
-        self._db = None
-        self.has_changed = False
+        self._db: Union[None, KindleDB, CSVDB] = None
 
         self._records = []
         self._counts = [0] * 4
 
+        self._output_path: str = output_path
+        self._exporter: Optional[DataExporter] = None  # lazy construct
+
     def __del__(self):
-        del self._db
+        if self._db is not None:
+            del self._db
+        if self._exporter is not None:
+            self._exporter.close_file()
+            del self._exporter
 
     def get(self, idx: int) -> dict:
         return self._records[idx]
@@ -127,63 +132,6 @@ class DataManager(QtCore.QObject):
         self.record_count_changed.emit()
         self.record_batch_load_finished.emit()
 
-    def save_all(self, output_path: str) -> str:
-        """
-        Helper function to save all _records
-        :return: Saved filename
-        """
-
-        save_file = "%s/maple-%s.txt" % (output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
-        exporter = DataExporter()
-        exporter.open_file(save_file)
-
-        record_count = len(self._records)
-        for i in range(record_count):
-
-            r = self._records[i]
-
-            # Set UI
-            if record_count < 150 or i % (int(record_count / 100)) == 0 or r["status"] in [self.CONFIRMED, self.DISCARDED]:
-                # Only show parts of animation to accelerate saving process
-                self.save_progress.emit(i)
-
-            # Generate data
-            if r["status"] == self.CONFIRMED:
-
-                example = clean_html(r["usage"])
-                if r["source_enabled"] and r["source"] != "":
-                    example += "<br>" + '<div align="right" style="font-size:12px">' + clean_html(r["source"]) + '</div>'
-                mp3 = exporter.generate_media(r["subject"], r["pron"])
-                para = clean_html(r["para"])
-                if r["img"]:
-                    img_file = exporter.new_random_filename("png")
-                    r["img"].save("%s/%s" % (exporter.media_path, img_file))
-                    para += '<div><br><img src="%s"><br></div>' % img_file
-                exporter.write_entry(r["subject"],
-                                     "[sound:%s]" % mp3,
-                                     para,
-                                     clean_html(r["ext"]),
-                                     example,
-                                     r["hint"],
-                                     r["freq"],
-                                     "1" if "R" in r["card"] else "",
-                                     "1" if "S" in r["card"] else "",
-                                     "1" if "D" in r["card"] else "")
-
-            # Write back to DB
-            if r["word_id"] is not None:
-                if r["status"] == self.CONFIRMED or r["status"] == self.DISCARDED:
-                    self._db.set_word_mature(r["word_id"], 100)
-
-        if self._db is not None:
-            self._db.commit_changes()
-
-        exporter.close_file()
-
-        self.has_changed = False
-
-        return save_file
-
     def set_status(self, idx: int, status: int) -> None:
         """
         Set record status
@@ -192,22 +140,67 @@ class DataManager(QtCore.QObject):
         :return:
         """
 
-        if self._records[idx]["status"] == status:  # nothing needs to be done
+        r = self._records[idx]
+        if r["status"] == status:  # nothing needs to be done
             return
 
-        if status == self.CONFIRMED or status == self.DISCARDED:
-            self.has_changed = True
+        old_status = r["status"]
 
-        old_status = self._records[idx]["status"]
+        if (old_status == self.CONFIRMED or old_status == self.DISCARDED) and \
+                (status == self.UNVIEWED or status == self.TOPROCESS):
+            self._db.set_word_mature(r["word_id"], 0)  # retract db status
+
+        if old_status == self.CONFIRMED:
+            if self._exporter is not None:
+                self._exporter.retract_subject(r["subject"])
+
+        if status == self.CONFIRMED:
+            if self._exporter is None:
+                self._construct_exporter()
 
         self._counts[old_status] -= 1
-        self._records[idx]["status"] = status
+        r["status"] = status
         self._counts[status] += 1
 
-        # TODO: output result and commit changes to data source immediately
+        if status == self.CONFIRMED:
+            self._save_entry(idx)
 
         self.record_status_changed.emit(idx, old_status, status)
         self.record_count_changed.emit()
+
+    def _construct_exporter(self) -> None:
+        save_file = "%s/maple-%s.txt" % (self._output_path, datetime.now().strftime('%Y-%m-%d-%H%M%S'))
+        self._exporter = DataExporter()
+        self._exporter.open_file(save_file)
+
+    def _save_entry(self, idx: int) -> None:
+        r = self._records[idx]
+
+        example = clean_html(r["usage"])
+        if r["source_enabled"] and r["source"] != "":
+            example += "<br>" + '<div align="right" style="font-size:12px">' + clean_html(
+                r["source"]) + '</div>'
+        mp3 = self._exporter.generate_media(r["subject"], r["pron"]) if r["pron"] != "Unknown" else ""
+        para = clean_html(r["para"])
+        if r["img"]:
+            img_file = self._exporter.new_random_filename("png")
+            r["img"].save("%s/%s" % (self._exporter.media_path, img_file))
+            para += '<div><br><img src="%s"><br></div>' % img_file
+        self._exporter.write_entry(r["subject"],
+                                   "[sound:%s]" % mp3,
+                                   para,
+                                   clean_html(r["ext"]),
+                                   example,
+                                   r["hint"],
+                                   r["freq"],
+                                   "1" if "R" in r["card"] else "",
+                                   "1" if "S" in r["card"] else "",
+                                   "1" if "D" in r["card"] else "")
+
+        # Write back to DB
+        if r["word_id"] is not None:
+            self._db.set_word_mature(r["word_id"], 100)
+            self._db.commit_changes()
 
     def add_new_single_entry(self, idx: int, subject: str = "", usage: str = "", source_enabled: bool = False,
                              source: str = '<div align="right" style="font-size:12px"></div>') -> None:
