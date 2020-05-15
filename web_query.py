@@ -46,8 +46,8 @@ class QueryManager(QtCore.QObject):
     """
 
     DELAY_REQUEST_TIME = 3000  # [ms]
-    QUERY_INTERVAL = 5000  # [ms]
-    QUERY_INTERRUPT_TIME = 10000  # [ms]
+    QUERY_INTERVAL = 8000  # [ms]
+    QUERY_INTERRUPT_TIME = 8000  # [ms]
 
     def __init__(self, worker_count: int):
         super().__init__()

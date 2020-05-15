@@ -146,24 +146,25 @@ class DataManager(QtCore.QObject):
 
         old_status = r["status"]
 
-        if (old_status == self.CONFIRMED or old_status == self.DISCARDED) and \
-                (status == self.UNVIEWED or status == self.TOPROCESS):
+        if old_status in [self.CONFIRMED, self.DISCARDED] and status in [self.UNVIEWED, self.TOPROCESS]:
             self._db.set_word_mature(r["word_id"], 0)  # retract db status
 
         if old_status == self.CONFIRMED:
             if self._exporter is not None:
                 self._exporter.retract_subject(r["subject"])
 
-        if status == self.CONFIRMED:
-            if self._exporter is None:
-                self._construct_exporter()
-
         self._counts[old_status] -= 1
         r["status"] = status
         self._counts[status] += 1
 
         if status == self.CONFIRMED:
+            if self._exporter is None:
+                self._construct_exporter()
             self._save_entry(idx)
+
+        if status in [self.CONFIRMED, self.DISCARDED]:
+            self._db.set_word_mature(r["word_id"], 100)
+            self._db.commit_changes()
 
         self.record_status_changed.emit(idx, old_status, status)
         self.record_count_changed.emit()
@@ -196,11 +197,6 @@ class DataManager(QtCore.QObject):
                                    "1" if "R" in r["card"] else "",
                                    "1" if "S" in r["card"] else "",
                                    "1" if "D" in r["card"] else "")
-
-        # Write back to DB
-        if r["word_id"] is not None:
-            self._db.set_word_mature(r["word_id"], 100)
-            self._db.commit_changes()
 
     def add_new_single_entry(self, idx: int, subject: str = "", usage: str = "", source_enabled: bool = False,
                              source: str = '<div align="right" style="font-size:12px"></div>') -> None:
