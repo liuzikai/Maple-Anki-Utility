@@ -163,8 +163,9 @@ class DataManager(QtCore.QObject):
             self._save_entry(idx)
 
         if status in [self.CONFIRMED, self.DISCARDED]:
-            self._db.set_word_mature(r["word_id"], 100)
-            self._db.commit_changes()
+            if self._db and r.get("word_id") is not None:
+                self._db.set_word_mature(r["word_id"], 100)
+                self._db.commit_changes()
 
         self.record_status_changed.emit(idx, old_status, status)
         self.record_count_changed.emit()

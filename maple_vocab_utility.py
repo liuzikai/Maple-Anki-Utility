@@ -255,23 +255,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     # ================================ UI Helper Functions ================================
 
-    def confirm_before_action(self, action_name):
-        """
-        If no changes are made, this function automatically return True.
-        If unsaved changes are made, this function asks user to confirm.
-        :param action_name: the action to be performed. Will be shown in the dialog box
-        :return: True if no changes or user confirmed, False if user canceled.
-        """
-        if self.data.count(self.data.TOPROCESS) > 0:
-            quit_msg = "Are you sure you want to %s? " \
-                       "Entries that are not confirmed or discarded will be lost. " \
-                       "Confirmed or discarded ones are saved automatically." % action_name
-            reply = QtWidgets.QMessageBox.question(self, 'Message',
-                                                   quit_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
-            return reply == QtWidgets.QMessageBox.Yes
-        else:
-            return True
-
     def editor_load_entry(self, idx):
         assert 0 <= idx <= self.data.count(), "Invalid index"
 
@@ -359,12 +342,6 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                     cursor.mergeCharFormat(fmt)
 
         return QtWidgets.QWidget.eventFilter(self, widget, event)
-
-    def closeEvent(self, event):
-        if self.confirm_before_action("exit"):
-            event.accept()
-        else:
-            event.ignore()
 
     @QtCore.pyqtSlot()
     def confirm_clicked(self):
@@ -459,23 +436,21 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def load_kindle_clicked(self) -> bool:
-        if self.confirm_before_action("reload database"):
-            if not self.data.reload_kindle_data(KINDLE_DB_FILENAME):
-                self.report_error("Failed to find Kindle DB file. Please make sure Kindle has connected.")
-                return False
+        if not self.data.reload_kindle_data(KINDLE_DB_FILENAME):
+            self.report_error("Failed to find Kindle DB file. Please make sure Kindle has connected.")
+            return False
         return True
 
     @QtCore.pyqtSlot()
     def load_csv_clicked(self) -> bool:
-        if self.confirm_before_action("reload database"):
-            options = QFileDialog.Options()
-            options |= QFileDialog.DontUseNativeDialog
-            csv_file, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
-                                                      "CSV Files (*.csv);;All Files (*)", options=options)
-            if csv_file:
-                if not self.data.reload_csv_data(csv_file):
-                    self.report_error("Failed to load CSV file.")
-                    return False
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        csv_file, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                  "CSV Files (*.csv);;All Files (*)", options=options)
+        if csv_file:
+            if not self.data.reload_csv_data(csv_file):
+                self.report_error("Failed to load CSV file.")
+                return False
 
         return True
 
@@ -523,8 +498,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def clear_list_clicked(self):
-        if self.confirm_before_action("clear list manually"):
-            self.data.clear()
+        self.data.clear()
 
     @QtCore.pyqtSlot()
     def card_type_changed(self):
