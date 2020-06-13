@@ -430,7 +430,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.query_google_images_clicked()
 
     @QtCore.pyqtSlot()
-    def image_double_clicked(self):
+    def image_double_clicked(self, event):
         self.cur_record()["img"] = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
