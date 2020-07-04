@@ -386,9 +386,16 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def suggest_clicked(self):
-        # self.subject.blockSignals(True)
-        self.subject.setPlainText(self.subjectSuggest.text()[len("Suggest: "):])
-        # self.subject.blockSignals(False)
+        # block signal so that it won't trigger discarding
+        self.subject.blockSignals(True)  # -------- subject signals blocked -------->
+
+        subject = self.cur_record()["suggestion"]
+        assert subject == self.subjectSuggest.text()[len("Suggest: "):], "Suggestion inconsistent"
+        self.cur_record()["subject"] = self.cur_record()["suggestion"]
+        self.subject.setPlainText(subject)
+        self.entryList.item(self.cur_idx()).setText(subject)
+
+        self.subject.blockSignals(False)  # <-------- subject signals unblocked --------
         self.subjectSuggest.setVisible(False)
 
     @QtCore.pyqtSlot()

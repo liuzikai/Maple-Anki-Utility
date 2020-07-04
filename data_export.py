@@ -57,7 +57,8 @@ class DataExporter:
         say_command = " ".join(["say", "-v", speaker, "-r", "175", "-o", '"%s"' % self.temp_media_file, '"%s"' % word])
         lame_command = " ".join(
             ['lame', '-m', 'm', '"%s"' % self.temp_media_file, '"%s/%s"' % (self.media_path, filename)])
-        self.media_proc = subprocess.Popen(say_command + " && " + lame_command, shell=True)  # non-blocking
+        self.media_proc = subprocess.Popen(say_command + " && " + lame_command,
+                                           shell=True, stdout=subprocess.DEVNULL)  # non-blocking
         return filename
 
     @staticmethod

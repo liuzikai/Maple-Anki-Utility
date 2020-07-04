@@ -46,7 +46,7 @@ class QueryManager(QtCore.QObject):
     """
 
     DELAY_REQUEST_TIME = 3000  # [ms]
-    QUERY_INTERVAL = 8000  # [ms]
+    QUERY_INTERVAL = 10000  # [ms]
     QUERY_INTERRUPT_TIME = 8000  # [ms]
 
     def __init__(self, worker_count: int):
@@ -154,7 +154,7 @@ class QueryManager(QtCore.QObject):
             # Parse suggestion
             suggestion = self._get_word_from_collins_url(sender.page().url().url())
             subject = self._worker[idx]["subject"]
-            if suggestion is not None and suggestion != subject:
+            if suggestion is not None and suggestion != subject.replace(' ', '-'):
                 self.collins_suggestion_retrieved.emit(subject, suggestion)
             # Retrieve freq and tip
             sender.page().runJavaScript("document.documentElement.outerHTML",
@@ -335,7 +335,7 @@ class QueryManager(QtCore.QObject):
             ret = url[len(self.URLS[self.COLLINS][:-2]):]
             if ret.find("?") != -1:
                 ret = ret[:ret.find("?")]
-            return ret.replace("-", " ")
+            return ret
         else:
             return None
 
