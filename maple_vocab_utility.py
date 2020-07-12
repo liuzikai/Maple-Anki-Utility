@@ -386,16 +386,15 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def suggest_clicked(self):
-        # block signal so that it won't trigger discarding
-        self.subject.blockSignals(True)  # -------- subject signals blocked -------->
+        suggestion = self.cur_record()["suggestion"]
+        assert suggestion == self.subjectSuggest.text()[len("Suggest: "):], "Suggestion inconsistent"
+        self.subject.setPlainText(suggestion)
+        # Trigger subject_changed() to discard query workers of original subject
+        # But Collins worker won't get discarded since its worker info have been updated when generating suggestion
 
-        subject = self.cur_record()["suggestion"]
-        assert subject == self.subjectSuggest.text()[len("Suggest: "):], "Suggestion inconsistent"
-        self.cur_record()["subject"] = self.cur_record()["suggestion"]
-        self.subject.setPlainText(subject)
-        self.entryList.item(self.cur_idx()).setText(subject)
+        # Trigger GOOGLE_IMAGE query
+        self.handle_delay_request_activated(suggestion, self.qm.COLLINS)
 
-        self.subject.blockSignals(False)  # <-------- subject signals unblocked --------
         self.subjectSuggest.setVisible(False)
 
     @QtCore.pyqtSlot()

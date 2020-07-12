@@ -141,8 +141,7 @@ class DataManager(QtCore.QObject):
         """
 
         r = self._records[idx]
-        if r["status"] == status:  # nothing needs to be done
-            return
+        # Even if the state is the same, we still do retract-save process since some entry may have been changed
 
         old_status = r["status"]
 
