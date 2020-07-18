@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# To compile pyqt: pyuic5 maple_utility.ui > maple_utility.py
+
 import sys
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
@@ -11,10 +13,19 @@ from web_query import *
 
 # KINDLE_DB_FILENAME = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab._db"
 KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab._db"
+CSV_DEFAULT_DIRECTORY = "/Users/liuzikai/Documents"
+THINGS_VOCAB_LIST = "English Quick List"
 SAVE_PATH = "/Users/liuzikai/Desktop"
 
 
 class MapleUtility(QMainWindow, Ui_MapleUtility):
+    """
+    MapleVocabUtility MainWindow.
+
+    This program is intended to follow MCV module (maybe?). This module works as the controller, handling UI behavior
+    and bridging UI, data modules and the QueryManager.
+    """
+
     WEB_QUERY_WORKER_COUNT = 6
     CARD_RD_THRESHOLD = 4
 
@@ -61,6 +72,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
         self.loadKindle.clicked.connect(self.load_kindle_clicked)
         self.loadCSV.clicked.connect(self.load_csv_clicked)
+        self.loadThings.clicked.connect(self.load_things_clicked)
         self.newEntry.clicked.connect(self.add_new_entry_clicked)
         self.clearList.clicked.connect(self.clear_list_clicked)
         self.checkR.stateChanged.connect(self.card_type_changed)
@@ -79,17 +91,17 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
         # Create WebViews and setup QueryManager
         self.qm = QueryManager(self.WEB_QUERY_WORKER_COUNT)
-        self.query_worker = []
+        self.query_workers = []
         self.create_query_workers()
         self.qm.start_worker.connect(self.start_query_worker)  # worker, url
         self.qm.interrupt_worker.connect(self.interrupt_query_worker)  # worker
         self.qm.worker_usage.connect(self.handle_worker_usage)  # finished, working, free
-        # self.qm.worker_progress.connect()  # worker, progress
         self.qm.worker_activated.connect(self.activate_query_worker)  # worker, finished
         self.qm.delay_request_activated.connect(self.handle_delay_request_activated)  # subject, query
         self.qm.active_worker_progress.connect(self.handle_active_worker_progress)  # active_worker, process
         self.qm.collins_suggestion_retrieved.connect(self.handle_collins_suggestion)  # original_subject, suggestion
         self.qm.collins_freq_retrieved.connect(self.set_word_freq)  # original_subject, freq, tip
+        self.forceStopQuery.clicked.connect(self.qm.force_stop_active_worker)
         self.qm.report_worker_usage()
 
         # Setup DataManager and connections
@@ -113,26 +125,26 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             wv.setObjectName("webView_" + str(i))
             self.webViewVerticalLayout.addWidget(wv)
             wv.setVisible(False)
-            self.query_worker.append(wv)
+            self.query_workers.append(wv)
 
             wv.loadStarted.connect(lambda idx=i: self.qm.load_started(idx))
             wv.loadProgress.connect(lambda progress, idx=i: self.qm.load_progress(idx, progress))
             wv.loadFinished.connect(lambda ok, idx=i: self.qm.load_finished(idx, ok))
 
-            wv.page().profile().setHttpUserAgent(self.qm.MAC_USER_AGENT)
+            wv.page().profile().setHttpUserAgent(self.qm._MAC_USER_AGENT)
             wv.page().profile().setProperty("X-Frame-Options", "Deny")
             # Prevent webView from grabbing focus when calling load() or stop()
             wv.settings().setAttribute(wv.settings().FocusOnNavigationEnabled, False)
 
     @QtCore.pyqtSlot(int, str)
     def start_query_worker(self, idx: int, url: str):
-        self.query_worker[idx].load(QtCore.QUrl(url))
+        self.query_workers[idx].load(QtCore.QUrl(url))
         print("Worker %d starts on %s" % (idx, url))
         QtCore.QCoreApplication.processEvents()
 
     @QtCore.pyqtSlot(int)
     def interrupt_query_worker(self, idx: int):
-        self.query_worker[idx].stop()
+        self.query_workers[idx].stop()
         print("Worker %d interrupted" % idx)
         QtCore.QCoreApplication.processEvents()
 
@@ -143,7 +155,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     @QtCore.pyqtSlot(int, bool)
     def activate_query_worker(self, idx: int, finished: bool):
         for i in range(self.WEB_QUERY_WORKER_COUNT):
-            self.query_worker[i].setVisible((i == idx))
+            self.query_workers[i].setVisible((i == idx))
         self.webLoadingView.setVisible(not finished)
 
     @QtCore.pyqtSlot(int, int)
@@ -441,24 +453,26 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.imageLabel.setText("Click \nto paste \nimage")
 
     @QtCore.pyqtSlot()
-    def load_kindle_clicked(self) -> bool:
+    def load_kindle_clicked(self) -> None:
         if not self.data.reload_kindle_data(KINDLE_DB_FILENAME):
             self.report_error("Failed to find Kindle DB file. Please make sure Kindle has connected.")
-            return False
-        return True
 
     @QtCore.pyqtSlot()
-    def load_csv_clicked(self) -> bool:
+    def load_csv_clicked(self) -> None:
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
-        csv_file, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
-                                                  "CSV Files (*.csv);;All Files (*)", options=options)
+        csv_file, _ = QFileDialog.getOpenFileName(self,
+                                                  "Select the CSV file",
+                                                  CSV_DEFAULT_DIRECTORY,
+                                                  "CSV Files (*.csv);;All Files (*)",
+                                                  options=options)
         if csv_file:
             if not self.data.reload_csv_data(csv_file):
                 self.report_error("Failed to load CSV file.")
-                return False
 
-        return True
+    @QtCore.pyqtSlot()
+    def load_things_clicked(self) -> None:
+        self.data.reload_things_list(THINGS_VOCAB_LIST)
 
     @staticmethod
     def report_error(info: str) -> None:

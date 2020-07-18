@@ -18,7 +18,7 @@
     <rect>
      <x>20</x>
      <y>22</y>
-     <width>1303</width>
+     <width>1297</width>
      <height>874</height>
     </rect>
    </property>
@@ -58,27 +58,14 @@
         </widget>
        </item>
        <item>
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>3</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
         <widget class="QGroupBox" name="groupBox_2">
          <property name="title">
-          <string>Load Data</string>
+          <string/>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_4">
+          <property name="spacing">
+           <number>8</number>
+          </property>
           <item>
            <widget class="QPushButton" name="loadKindle">
             <property name="text">
@@ -94,6 +81,13 @@
            </widget>
           </item>
           <item>
+           <widget class="QPushButton" name="loadThings">
+            <property name="text">
+             <string>Things List</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="newEntry">
             <property name="text">
              <string>New Single Entry</string>
@@ -103,7 +97,7 @@
           <item>
            <widget class="QPushButton" name="clearList">
             <property name="text">
-             <string>Clear List</string>
+             <string>Clear </string>
             </property>
            </widget>
           </item>
@@ -839,11 +833,18 @@ p, li { white-space: pre-wrap; }
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout_7">
+            <layout class="QHBoxLayout" name="horizontalLayout_8">
              <item>
               <widget class="QProgressBar" name="webLoadingBar">
                <property name="value">
                 <number>24</number>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="forceStopQuery">
+               <property name="text">
+                <string>Force Stop</string>
                </property>
               </widget>
              </item>

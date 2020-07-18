@@ -9,16 +9,37 @@ from pyquery import PyQuery as pq
 
 
 class QueryManager(QtCore.QObject):
+    """
+    Web Query manager module.
+
+    The main purpose of introducing such an individual module is to achieve properly-scheduled pre-queries. When the
+    user has a list of word and works on one of them, MapleVocabUtility may initiate web queries of later words.
+    When the user switches to the later words, queried web pages can be presented immediately. The number of pre-loaded
+    web pages are limited so that the memory and internet usage is bounded.
+
+    Each web page is loaded in a QWebEngineView object, which is called a 'worker' in current module. MainWindow is
+    responsible for creating QWebEngineView objects, while this module controls them through signals.
+
+    Interface of this module is designed to hide scheduling details from MainWindow. MainWindow supplies a list of
+    words, and ask for web sites at the time they are needed. This module will notify the MainWindow to make a specific
+    worker visible while hiding the others. Ideally, the web site would has been loaded in the QWebEngineView. If not,
+    then it must be loading...
+    """
+
+    # ================================ Signals ================================
+
+    # Signals to control QWebEngineView
     start_worker = QtCore.pyqtSignal(int, str)  # worker, url
     interrupt_worker = QtCore.pyqtSignal(int)  # worker
+
+    # Signals for MainWindow to update UI
     worker_progress = QtCore.pyqtSignal(int, int)  # worker, progress
     worker_usage = QtCore.pyqtSignal(int, int, int)  # finished, working, free
-
     worker_activated = QtCore.pyqtSignal(int, bool)  # worker, finished
     active_worker_progress = QtCore.pyqtSignal(int, int)  # active_worker, process
 
+    # Signals for MainWindow to update data or perform actions
     delay_request_activated = QtCore.pyqtSignal(str, int)  # subject, query
-
     collins_suggestion_retrieved = QtCore.pyqtSignal(str, str)  # original_subject, suggestion
     collins_freq_retrieved = QtCore.pyqtSignal(str, int, str)  # original_subject, freq, tip
 
@@ -27,17 +48,19 @@ class QueryManager(QtCore.QObject):
     GOOGLE_TRANSLATE = 2
     GOOGLE = 3
 
-    URLS = [
+    # ================================ Internal Constants ================================
+
+    _URLS = [
         u"https://www.collinsdictionary.com/dictionary/english/%s",
         u"https://www.google.com/search?tbm=isch&q=%s",
         u"https://translate.google.com/?sl=en&tl=zh-CN&text=%s",
         u"https://www.google.com/search?q=%s"
     ]
 
-    MAC_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Safari/605.1.15"
-    IOS_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+    _MAC_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Safari/605.1.15"
+    _IOS_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 
-    COLLINS_POST_JS = """
+    _COLLINS_POST_JS = """
     let selectors = ['iframe', '.topslot_container', '.cB-hook', '#videos', '.socialButtons', '.tabsNavigation',
                      '.res_cell_right', '.btmslot_a-container', '.exercise', '.mpuslot_b-container',
                      '._hj-f5b2a1eb-9b07_feedback_minimized_label', '.share-button', '.ac_leftslot_a',
@@ -45,9 +68,9 @@ class QueryManager(QtCore.QObject):
     selectors.forEach(selector => document.querySelectorAll(selector).forEach(el => el.remove()));
     """
 
-    DELAY_REQUEST_TIME = 3000  # [ms]
-    QUERY_INTERVAL = 10000  # [ms]
-    QUERY_INTERRUPT_TIME = 8000  # [ms]
+    _DELAY_REQUEST_TIME = 3000  # [ms]
+    _QUERY_INTERVAL = 10000  # [ms]
+    _QUERY_INTERRUPT_TIME = 20000  # [ms]
 
     def __init__(self, worker_count: int):
         super().__init__()
@@ -64,14 +87,16 @@ class QueryManager(QtCore.QObject):
                 "forced_stopped": False
             })
 
-        self._active_worker = -1
+        self._active_worker = -1  # index of the active worker, which is also the visible one in MainWindow
 
+        # Worker index lists
         self._finished_workers = deque()
         self._working_workers = deque()
         self._free_workers = deque()
         for i in range(self._worker_count):
             self._free_workers.append(i)
 
+        # Timers to monitor each worker and timeout them
         self._worker_timer = []
         for i in range(self._worker_count):
             timer = QtCore.QTimer()
@@ -79,15 +104,18 @@ class QueryManager(QtCore.QObject):
             timer.timeout.connect(lambda idx=i: self._worker_timeout(idx))
             self._worker_timer.append(timer)
 
+        # Lists of query requests
         self._query_count = {}
-        self._pending_queries = deque()  # (subject, query, worker)
-        self._started_queries = deque()  # (subject, query)
+        self._pending_queries = deque()  # (subject, query)
+        self._started_queries = deque()  # (subject, query, worker)
 
+        # Timer to initiate queries in period
         self._query_timer = QtCore.QTimer()
         self._query_timer.setSingleShot(False)
         self._query_timer.timeout.connect(self._query_timer_timeout)
-        self._query_timer.start(self.QUERY_INTERVAL)
+        self._query_timer.start(self._QUERY_INTERVAL)
 
+        # Timer to handle delayed queries
         self._delay_request = None
         self._delay_request_timer = QtCore.QTimer()
         self._delay_request_timer.setSingleShot(True)
@@ -157,14 +185,18 @@ class QueryManager(QtCore.QObject):
             # Space will be replace by '-' in url, but there are cases that subject itself contains '-'
             if suggestion is not None and suggestion != subject.replace(' ', '-'):
                 self.collins_suggestion_retrieved.emit(subject, suggestion)
-                self._worker[idx]["subject"] = suggestion  # update query info to avoid the worker from losing track
+                # Update query info to avoid the worker from losing track
+                self._worker[idx]["subject"] = suggestion
+                for i in range(len(self._started_queries)):
+                    if self._started_queries[i][2] == idx:
+                        self._started_queries[i] = (suggestion, self._started_queries[i][1], idx)
             # Retrieve freq and tip
             sender.page().runJavaScript("document.documentElement.outerHTML",
                                         # Pass subject string instead of idx in this async case
                                         lambda html, s=subject: self._collins_web_to_html_callback(s, html))
             QtCore.QCoreApplication.processEvents()
             # Clean up page
-            sender.page().runJavaScript(self.COLLINS_POST_JS)
+            sender.page().runJavaScript(self._COLLINS_POST_JS)
 
     def queue(self, subject: str, query: int, front: bool = False):
         c = self._query_count.get((subject, query))
@@ -199,7 +231,7 @@ class QueryManager(QtCore.QObject):
 
         # If there is free worker, use it immediately
         if len(self._free_workers) > 0:
-            self._query_timer.start(self.QUERY_INTERVAL)  # reset the timer
+            self._query_timer.start(self._QUERY_INTERVAL)  # reset the timer
 
             worker = self._free_workers.popleft()
             self._working_workers.append(worker)
@@ -213,7 +245,7 @@ class QueryManager(QtCore.QObject):
             return
 
         # If not, postpone the last started query and use its worker
-        self._query_timer.start(self.QUERY_INTERVAL)  # reset the timer
+        self._query_timer.start(self._QUERY_INTERVAL)  # reset the timer
 
         (s, q, worker) = self._started_queries.pop()
         self._pending_queries.appendleft((s, q))
@@ -237,7 +269,7 @@ class QueryManager(QtCore.QObject):
 
     def delay_request(self, subject: str, query: int):
         """
-        If the query is already started, request immediately. If not, delay for DELAY_REQUEST_TIME before actually
+        If the query is already started, request immediately. If not, delay for _DELAY_REQUEST_TIME before actually
         request or cancel if discarded during the delay time
         :param subject:
         :param query:
@@ -249,7 +281,7 @@ class QueryManager(QtCore.QObject):
 
         self._delay_request = (subject, query)
         # If there is already a delay request, simply overwrite it and reset timer as follows
-        self._delay_request_timer.start(self.DELAY_REQUEST_TIME)
+        self._delay_request_timer.start(self._DELAY_REQUEST_TIME)
 
     def discard_by_subject(self, subject):
         for query in range(4):
@@ -278,6 +310,12 @@ class QueryManager(QtCore.QObject):
                     to_remove = self._find_in_pending_queries(subject, query)
                     if to_remove is not None:
                         self._pending_queries.remove(to_remove)
+
+    @QtCore.pyqtSlot()
+    def force_stop_active_worker(self):
+        self._worker_timeout(self._active_worker)
+
+    # ================================ Helper Functions ================================
 
     def _force_stop_worker(self, idx: int) -> None:
         """
@@ -333,8 +371,8 @@ class QueryManager(QtCore.QObject):
             return 0, str(err)
 
     def _get_word_from_collins_url(self, url: str):
-        if url.startswith(self.URLS[self.COLLINS][:-2]):
-            ret = url[len(self.URLS[self.COLLINS][:-2]):]
+        if url.startswith(self._URLS[self.COLLINS][:-2]):
+            ret = url[len(self._URLS[self.COLLINS][:-2]):]
             if ret.find("?") != -1:
                 ret = ret[:ret.find("?")]
             return ret
@@ -363,8 +401,8 @@ class QueryManager(QtCore.QObject):
         self._worker[idx]["subject"] = subject
         self._worker[idx]["query"] = query
         self._started_queries.append((subject, query, idx))
-        self.start_worker.emit(idx, self.URLS[query] % subject)
-        self._worker_timer[idx].start(self.QUERY_INTERRUPT_TIME)
+        self.start_worker.emit(idx, self._URLS[query] % subject)
+        self._worker_timer[idx].start(self._QUERY_INTERRUPT_TIME)
 
     def report_worker_usage(self):
         self.worker_usage.emit(len(self._finished_workers), len(self._working_workers), len(self._free_workers))

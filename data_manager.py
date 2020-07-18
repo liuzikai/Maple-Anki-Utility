@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 
 class DataManager(QtCore.QObject):
+
     UNVIEWED = 0  # not viewed yet
     TOPROCESS = 1  # already viewed at least one (has been pronounced)
     CONFIRMED = 2
@@ -25,7 +26,7 @@ class DataManager(QtCore.QObject):
 
         super().__init__()
 
-        self._db: Union[None, KindleDB, CSVDB] = None
+        self._db: Optional[DB] = None
 
         self._records = []
         self._counts = [0] * 4
@@ -99,11 +100,24 @@ class DataManager(QtCore.QObject):
         if self._db is not None:
             del self._db
             self._db = None
-        self._db = CSVDB(csv_file)
+        self._db = CsvDB(csv_file)
 
         self._reload_from_db()
 
         return True
+
+    def reload_things_list(self, things_list: str) -> None:
+        """
+        Clear _records and load _records from given Things list.
+        :return: None
+        """
+        # Setup database to Things DB
+        if self._db is not None:
+            del self._db
+            self._db = None
+        self._db = ThingsDB(things_list)
+
+        self._reload_from_db()
 
     def _reload_from_db(self) -> None:
 
