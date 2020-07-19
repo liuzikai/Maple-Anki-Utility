@@ -311,6 +311,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     def move_to_next(self):
         self.qm.discard_by_subject(self.cur_record()["subject"])
+        suggestion = self.cur_record().get("suggestion")
+        if suggestion is not None and suggestion != self.cur_record()["subject"]:
+            self.qm.discard_by_subject(suggestion)
         if self.cur_idx() < self.data.count() - 1:
             self.entryList.setCurrentRow(self.cur_idx() + 1)
             # Loading data will be completed by selected_changed()
