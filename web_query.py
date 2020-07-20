@@ -105,9 +105,9 @@ class QueryManager(QtCore.QObject):
             self._worker_timer.append(timer)
 
         # Lists of query requests
-        self._query_count = {}
+        self._query_count = {}  # (subject, query) -> int
         self._pending_queries = deque()  # (subject, query)
-        self._started_queries = deque()  # (subject, query, worker)
+        self._started_queries = deque()  # [subject, query, worker]
 
         # Timer to initiate queries in period
         self._query_timer = QtCore.QTimer()
@@ -188,8 +188,15 @@ class QueryManager(QtCore.QObject):
                 # Update query info to avoid the worker from losing track
                 self._worker[idx]["subject"] = suggestion
                 for i in range(len(self._started_queries)):
-                    if self._started_queries[i][2] == idx:
-                        self._started_queries[i] = (suggestion, self._started_queries[i][1], idx)
+                    if self._started_queries[i][2] == idx and self._started_queries[i][1] == self.COLLINS:
+                        self._started_queries[i][0] = suggestion
+                        self._query_count[(subject, self.COLLINS)] -= 1
+                        c = self._query_count.get((suggestion, self.COLLINS))
+                        if c is None:
+                            self._query_count[(suggestion, self.COLLINS)] = 1
+                        else:
+                            self._query_count[(suggestion, self.COLLINS)] = c + 1
+
             # Retrieve freq and tip
             sender.page().runJavaScript("document.documentElement.outerHTML",
                                         # Pass subject string instead of idx in this async case
@@ -247,7 +254,7 @@ class QueryManager(QtCore.QObject):
         # If not, postpone the last started query and use its worker
         self._query_timer.start(self._QUERY_INTERVAL)  # reset the timer
 
-        (s, q, worker) = self._started_queries.pop()
+        s, q, worker = tuple(self._started_queries.pop())
         self._pending_queries.appendleft((s, q))
 
         if worker in self._working_workers:
@@ -289,6 +296,7 @@ class QueryManager(QtCore.QObject):
             if c is not None and c > 0:
                 c -= 1
                 self._query_count[(subject, query)] = c
+
                 if c == 0:  # only actually discard query when duplication count goes to 0
 
                     # Search in _started queries
@@ -307,9 +315,13 @@ class QueryManager(QtCore.QObject):
                         self.report_worker_usage()
 
                     # Search in started _pending_queries
-                    to_remove = self._find_in_pending_queries(subject, query)
-                    if to_remove is not None:
-                        self._pending_queries.remove(to_remove)
+                    try:
+                        self._pending_queries.remove((subject, query))
+                    except ValueError:
+                        pass
+
+            if self._delay_request == (subject, query):
+                self._delay_request = None
 
     @QtCore.pyqtSlot()
     def force_stop_active_worker(self):
@@ -332,17 +344,9 @@ class QueryManager(QtCore.QObject):
             self._active_worker = -1
             self.worker_activated.emit(-1, True)
 
-    def _find_in_started_queries(self, subject: str, query: int) -> (str, int, int):
+    def _find_in_started_queries(self, subject: str, query: int) -> list:
         ret = None
         for q in self._started_queries:
-            if q[0] == subject and q[1] == query:
-                ret = q
-                break
-        return ret
-
-    def _find_in_pending_queries(self, subject: str, query: int) -> (str, int):
-        ret = None
-        for q in self._pending_queries:
             if q[0] == subject and q[1] == query:
                 ret = q
                 break
@@ -400,7 +404,7 @@ class QueryManager(QtCore.QObject):
     def _start_worker(self, idx: int, subject: str, query: int) -> None:
         self._worker[idx]["subject"] = subject
         self._worker[idx]["query"] = query
-        self._started_queries.append((subject, query, idx))
+        self._started_queries.append([subject, query, idx])
         self.start_worker.emit(idx, self._URLS[query] % subject)
         self._worker_timer[idx].start(self._QUERY_INTERRUPT_TIME)
 
