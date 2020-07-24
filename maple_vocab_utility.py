@@ -403,6 +403,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
     def suggest_clicked(self):
         suggestion = self.cur_record()["suggestion"]
         assert suggestion == self.subjectSuggest.text()[len("Suggest: "):], "Suggestion inconsistent"
+        self.qm.apply_suggestion(self.cur_record()["subject"], suggestion)
         self.subject.setPlainText(suggestion)
         # Trigger subject_changed() to discard query workers of original subject
         # But Collins worker won't get discarded since its worker info have been updated when generating suggestion

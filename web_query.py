@@ -185,17 +185,6 @@ class QueryManager(QtCore.QObject):
             # Space will be replace by '-' in url, but there are cases that subject itself contains '-'
             if suggestion is not None and suggestion != subject.replace(' ', '-'):
                 self.collins_suggestion_retrieved.emit(subject, suggestion)
-                # Update query info to avoid the worker from losing track
-                self._worker[idx]["subject"] = suggestion
-                for i in range(len(self._started_queries)):
-                    if self._started_queries[i][2] == idx and self._started_queries[i][1] == self.COLLINS:
-                        self._started_queries[i][0] = suggestion
-                        self._query_count[(subject, self.COLLINS)] -= 1
-                        c = self._query_count.get((suggestion, self.COLLINS))
-                        if c is None:
-                            self._query_count[(suggestion, self.COLLINS)] = 1
-                        else:
-                            self._query_count[(suggestion, self.COLLINS)] = c + 1
 
             # Retrieve freq and tip
             sender.page().runJavaScript("document.documentElement.outerHTML",
@@ -204,6 +193,19 @@ class QueryManager(QtCore.QObject):
             QtCore.QCoreApplication.processEvents()
             # Clean up page
             sender.page().runJavaScript(self._COLLINS_POST_JS)
+
+    def apply_suggestion(self, subject: str, suggestion: str):
+        # Update query info to avoid the worker from losing track
+        for i in range(len(self._started_queries)):
+            if self._started_queries[i][0] == subject and self._started_queries[i][1] == self.COLLINS:
+                self._started_queries[i][0] = suggestion
+                self._query_count[(subject, self.COLLINS)] -= 1
+                c = self._query_count.get((suggestion, self.COLLINS))
+                if c is None:
+                    self._query_count[(suggestion, self.COLLINS)] = 1
+                else:
+                    self._query_count[(suggestion, self.COLLINS)] = c + 1
+                self._worker[self._started_queries[i][3]]["subject"] = suggestion
 
     def queue(self, subject: str, query: int, front: bool = False):
         c = self._query_count.get((subject, query))
