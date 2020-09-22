@@ -205,7 +205,7 @@ class QueryManager(QtCore.QObject):
                     self._query_count[(suggestion, self.COLLINS)] = 1
                 else:
                     self._query_count[(suggestion, self.COLLINS)] = c + 1
-                self._worker[self._started_queries[i][3]]["subject"] = suggestion
+                self._worker[self._started_queries[i][2]]["subject"] = suggestion
 
     def queue(self, subject: str, query: int, front: bool = False):
         c = self._query_count.get((subject, query))
