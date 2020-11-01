@@ -34,7 +34,7 @@ class QueryManager(QtCore.QObject):
 
     # Signals for MainWindow to update UI
     worker_progress = QtCore.pyqtSignal(int, int)  # worker, progress
-    worker_usage = QtCore.pyqtSignal(int, int, int)  # finished, working, free
+    worker_usage = QtCore.pyqtSignal(int, int, int, str)  # finished, working, free, tooltip
     worker_activated = QtCore.pyqtSignal(int, bool)  # worker, finished
     active_worker_progress = QtCore.pyqtSignal(int, int)  # active_worker, process
 
@@ -411,7 +411,10 @@ class QueryManager(QtCore.QObject):
         self._worker_timer[idx].start(self._QUERY_INTERRUPT_TIME)
 
     def report_worker_usage(self):
-        self.worker_usage.emit(len(self._finished_workers), len(self._working_workers), len(self._free_workers))
+        tooltips = []
+        for i in range(self._worker_count):
+            tooltips.append("%d: %s %s" % (i, self._worker[i]["subject"], self._worker[i]["query"]))
+        self.worker_usage.emit(len(self._finished_workers), len(self._working_workers), len(self._free_workers), "\n".join(tooltips))
 
     @QtCore.pyqtSlot()
     def _delay_request_timeout(self):

@@ -13,7 +13,7 @@ from web_query import *
 
 # KINDLE_DB_FILENAME = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab._db"
 KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab._db"
-CSV_DEFAULT_DIRECTORY = "/Users/liuzikai/Documents"
+CSV_DEFAULT_DIRECTORY = "/Users/liuzikai/Documents/Archive/GRE"
 THINGS_VOCAB_LIST = "English Quick List"
 SAVE_PATH = "/Users/liuzikai/Desktop"
 
@@ -148,9 +148,10 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         print("Worker %d interrupted" % idx)
         QtCore.QCoreApplication.processEvents()
 
-    @QtCore.pyqtSlot(int, int, int)
-    def handle_worker_usage(self, finished: int, working: int, free: int):
+    @QtCore.pyqtSlot(int, int, int, str)
+    def handle_worker_usage(self, finished: int, working: int, free: int, tooltip: str):
         self.queryStatusLabel.setText("%d/%d/%d" % (finished, working, free))
+        self.queryStatusLabel.setToolTip(tooltip)
 
     @QtCore.pyqtSlot(int, bool)
     def activate_query_worker(self, idx: int, finished: bool):
