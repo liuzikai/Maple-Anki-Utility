@@ -1,7 +1,8 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import subprocess
+import tempfile
+import os
 
 
 class DataExporter:
@@ -12,10 +13,9 @@ class DataExporter:
         # ";": "&#59;"
     }
 
-    def __init__(self):
-        # TODO: instead of hard-coding find a better way to acquire these paths
-        self.media_path = "/Users/liuzikai/Library/Application Support/Anki2/liuzikai/collection.media"
-        self.temp_media_file = "/tmp/isay.aiff"
+    def __init__(self, media_path: str):
+        self.media_path = media_path
+        self.temp_media_file = os.path.join(tempfile.gettempdir(), "isay.aiff")
         self.f = None
 
         self.media_proc = None

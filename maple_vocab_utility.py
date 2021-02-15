@@ -1,37 +1,29 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 # To compile pyqt: pyuic5 maple_utility.ui > maple_utility.py
 
 import sys
+import os
+from typing import Optional, Dict, cast
+from PyQt5 import QtCore, QtWidgets, QtGui
+from data_manager import DataManager, Record, RecordStatus
+from maple_utility import Ui_MapleUtility
+from web_query_view import WebQueryView, QueryType
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
-
-from data_manager import *
-from maple_utility import *
-from web_query import *
-
-# KINDLE_DB_FILENAME = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/test_vocab._db"
-KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab._db"
+# KINDLE_DB_FILENAME = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/resource/test_vocab.db"
+KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab.db"
 CSV_DEFAULT_DIRECTORY = "/Users/liuzikai/Documents/Archive/GRE"
 THINGS_VOCAB_LIST = "English Quick List"
 SAVE_PATH = "/Users/liuzikai/Desktop"
+ANKI_MEDIA_PATH = "/Users/liuzikai/Library/Application Support/Anki2/liuzikai/collection.media"
 
 
-class MapleUtility(QMainWindow, Ui_MapleUtility):
-    """
-    MapleVocabUtility MainWindow.
+class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
+    """MapleVocabUtility MainWindow."""
 
-    This program is intended to follow MCV module (maybe?). This module works as the controller, handling UI behavior
-    and bridging UI, data modules and the QueryManager.
-    """
-
-    WEB_QUERY_WORKER_COUNT = 6
     CARD_RD_THRESHOLD = 4
 
-    def __init__(self, app, parent=None):
-
-        self.app = app
+    def __init__(self, parent=None):
 
         # Setup UI and connections
         super(MapleUtility, self).__init__(parent)
@@ -41,33 +33,35 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         self.discardButton.clicked.connect(self.discard_clicked)
         self.entryList.selectionModel().selectionChanged.connect(self.selected_changed)
         self.subject.textChanged.connect(self.subject_changed)
-        self.subject.installEventFilter(self)
+        self.subject.installEventFilter(self)  # response to Return key
         self.subjectSuggest.setVisible(False)
         self.subjectSuggest.clicked.connect(self.suggest_clicked)
-        self.freqBar.mouseDoubleClickEvent = self.freq_bar_double_clicked
         self.pronSamantha.clicked.connect(self.pron_clicked)
         self.pronDaniel.clicked.connect(self.pron_clicked)
         self.paraphrase.textChanged.connect(self.paraphrase_changed)
-        self.paraphrase.installEventFilter(self)
+        self.paraphrase.installEventFilter(self)  # response to Ctrl + I/B
         self.extension.textChanged.connect(self.extension_changed)
         self.example.textChanged.connect(self.example_changed)
-        self.example.installEventFilter(self)
+        self.example.installEventFilter(self)  # response to Ctrl + I/B
         self.checkSource.stateChanged.connect(self.source_check_changed)
         self.source.textChanged.connect(self.source_changed)
-        self.source.installEventFilter(self)
+        self.source.installEventFilter(self)  # response to Ctrl + I/B
         self.hint.textChanged.connect(self.hint_changed)
-        # These shortcuts are global, while the eventFilter needs to be connected to widgets manually
-        self.next_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
-        self.next_shortcut.activated.connect(self.confirm_clicked)
+        # These shortcuts are global
+        self.confirm_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
+        self.confirm_shortcut.activated.connect(self.confirm_clicked)
         self.confirm_and_smart_duplicate_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Return"), self)
         self.confirm_and_smart_duplicate_shortcut.activated.connect(self.confirm_and_smart_duplicate_entry)
+        self.confirmButton.setToolTip("Shortcut: Ctrl + Return\nConfirm and smart duplicate: Ctrl + Shift + Return")
         self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_clicked)
+        self.discardButton.setToolTip("Shortcut: Ctrl + Alt + Return")
         self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
         self.new_entry_shortcut.activated.connect(self.add_new_entry_clicked)
         self.smart_duplicate_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+N"), self)
         self.smart_duplicate_shortcut.activated.connect(self.smart_duplicate_entry)
-        # There is no mouse signals for label. We use function override
+        self.newEntry.setToolTip("Shortcut: Ctrl + N\nSmart duplicate: Ctrl + Shift + N")
+        # There is no mouse signal for label. Override functions.
         self.imageLabel.mousePressEvent = self.image_clicked
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
         self.loadKindle.clicked.connect(self.load_kindle_clicked)
@@ -87,121 +81,90 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
                                   self.paraphrase, self.imageLabel, self.extension, self.example, self.checkSource,
                                   self.source, self.hint, self.checkR, self.checkS, self.checkD,
                                   self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
-        self.is_saving = False
 
-        # Create WebViews and setup QueryManager
-        self.qm = QueryManager(self.WEB_QUERY_WORKER_COUNT)
-        self.query_workers = []
-        self.create_query_workers()
-        self.qm.start_worker.connect(self.start_query_worker)  # worker, url
-        self.qm.interrupt_worker.connect(self.interrupt_query_worker)  # worker
-        self.qm.worker_usage.connect(self.handle_worker_usage)  # finished, working, free
-        self.qm.worker_activated.connect(self.activate_query_worker)  # worker, finished
-        self.qm.delay_request_activated.connect(self.handle_delay_request_activated)  # subject, query
-        self.qm.active_worker_progress.connect(self.handle_active_worker_progress)  # active_worker, process
-        self.qm.collins_suggestion_retrieved.connect(self.handle_collins_suggestion)  # original_subject, suggestion
-        self.qm.collins_freq_retrieved.connect(self.set_word_freq)  # original_subject, freq, tip
-        self.forceStopQuery.clicked.connect(self.qm.force_stop_active_worker)
-        self.qm.report_worker_usage()
+        # Setup WebQueryView
+        self.wqv = WebQueryView(self.webViewFrame)
+        self.wqv.setMinimumSize(QtCore.QSize(600, 0))
+        self.wqv.setMaximumSize(QtCore.QSize(600, 16777215))
+        self.webViewVerticalLayout.insertWidget(0, self.wqv)
+        self.wqv.usage_updated.connect(self.handle_query_worker_usage)
+        self.wqv.active_worker_progress.connect(self.handle_active_worker_progress)
+        self.wqv.collins_suggestion_retrieved.connect(self.handle_collins_suggestion)
+        self.wqv.collins_freq_retrieved.connect(self.set_word_freq)
+        self.forceStopQuery.clicked.connect(self.wqv.force_stop_active_worker)
+        self.wqv.report_worker_usage()  # update query usage label
 
         # Setup DataManager and connections
-        self.data = DataManager(SAVE_PATH)
-        self.data.record_status_changed.connect(self.handle_record_status_changed)  # index, old_status, new_status
-        self.data.record_batch_load_finished.connect(self.handle_record_batch_load_finished)
+        self.data = DataManager(SAVE_PATH, ANKI_MEDIA_PATH)
+        self.data.record_inserted.connect(self.handle_record_insertion)  # cid, batch_loading(True) / add_single(False)
+        self.data.record_status_changed.connect(self.handle_record_status_changed)  # cid, old_status, new_status
         self.data.record_cleared.connect(self.handle_record_clear)
-        self.data.record_inserted.connect(self.handle_record_insertion)  # index, batch_loading(True)/add_single(False)
         self.data.record_count_changed.connect(self.update_ui_after_record_count_changed)
+        self.data.batch_load_finished.connect(self.handle_record_batch_load_finished)
 
-        # Setup initial interface
+        # QListWidgetItem can only be deleted when records are cleared
+        self.cid_to_item: Dict[int, QtWidgets.QListWidgetItem] = {}
+
+        # Setup initial UI
         self.update_ui_after_record_count_changed()
 
     # ================================ Web Query Related ================================
 
-    def create_query_workers(self) -> None:
-        for i in range(self.WEB_QUERY_WORKER_COUNT):
-            wv = QtWebEngineWidgets.QWebEngineView(self.webViewFrame)
-            wv.setMinimumSize(QtCore.QSize(600, 0))
-            wv.setMaximumSize(QtCore.QSize(600, 16777215))
-            wv.setObjectName("webView_" + str(i))
-            self.webViewVerticalLayout.addWidget(wv)
-            wv.setVisible(False)
-            self.query_workers.append(wv)
-
-            wv.loadStarted.connect(lambda idx=i: self.qm.load_started(idx))
-            wv.loadProgress.connect(lambda progress, idx=i: self.qm.load_progress(idx, progress))
-            wv.loadFinished.connect(lambda ok, idx=i: self.qm.load_finished(idx, ok))
-
-            wv.page().profile().setHttpUserAgent(self.qm._MAC_USER_AGENT)
-            wv.page().profile().setProperty("X-Frame-Options", "Deny")
-            # Prevent webView from grabbing focus when calling load() or stop()
-            wv.settings().setAttribute(wv.settings().FocusOnNavigationEnabled, False)
-
-    @QtCore.pyqtSlot(int, str)
-    def start_query_worker(self, idx: int, url: str):
-        self.query_workers[idx].load(QtCore.QUrl(url))
-        print("Worker %d starts on %s" % (idx, url))
-        QtCore.QCoreApplication.processEvents()
+    @QtCore.pyqtSlot(int, int, int)
+    def handle_query_worker_usage(self, finished: int, working: int, free: int):
+        self.queryStatusLabel.setText("%d/%d/%d" % (finished, working, free))
 
     @QtCore.pyqtSlot(int)
-    def interrupt_query_worker(self, idx: int):
-        self.query_workers[idx].stop()
-        print("Worker %d interrupted" % idx)
-        QtCore.QCoreApplication.processEvents()
+    def handle_active_worker_progress(self, progress: int):
+        if progress == -1:
+            self.webLoadingView.setVisible(False)
+        else:
+            self.webLoadingView.setVisible(True)
+            self.webLoadingBar.setValue(progress)
 
-    @QtCore.pyqtSlot(int, int, int, str)
-    def handle_worker_usage(self, finished: int, working: int, free: int, tooltip: str):
-        self.queryStatusLabel.setText("%d/%d/%d" % (finished, working, free))
-        self.queryStatusLabel.setToolTip(tooltip)
+    @QtCore.pyqtSlot(int, int, str)
+    def set_word_freq(self, cid: int, freq: int, freq_note: str):
+        r = self.data.get(cid)
+        r.freq = freq
+        if freq >= self.CARD_RD_THRESHOLD:
+            r.cards = "RD"
+        else:
+            r.cards = "R"
+        r.freq_note = freq_note
+        if self.cur_cid() == cid:
+            self.editor_load_entry(self.cur_cid())
 
-    @QtCore.pyqtSlot(int, bool)
-    def activate_query_worker(self, idx: int, finished: bool):
-        for i in range(self.WEB_QUERY_WORKER_COUNT):
-            self.query_workers[i].setVisible((i == idx))
-        self.webLoadingView.setVisible(not finished)
-
-    @QtCore.pyqtSlot(int, int)
-    def handle_active_worker_progress(self, active_worker: int, progress: int):
-        self.webLoadingBar.setValue(progress)
-
-    @QtCore.pyqtSlot(str, int)
-    def handle_delay_request_activated(self, subject: str, query: int):
-        if query == self.qm.COLLINS:
-            self.qm.queue(subject, self.qm.GOOGLE_IMAGE, front=True)
-
-    @QtCore.pyqtSlot(str, int, str)
-    def set_word_freq(self, subject: str, freq: int, tips: str):
-        for r in self.data.get_by_subject(subject):
-            r["freq"] = freq
-            if freq >= self.CARD_RD_THRESHOLD:
-                r["card"] = "RD"
-            else:
-                r["card"] = "R"
-            r["tips"] = tips
-
-        if self.cur_record()["subject"] == subject:
-            self.editor_load_entry(self.cur_idx())
-
-    @QtCore.pyqtSlot(str, str)
-    def handle_collins_suggestion(self, original_subject: str, suggestion: str):
-        for r in self.data.get_by_subject(original_subject):
-            r["suggestion"] = suggestion
-
-        if self.cur_record()["subject"] == original_subject:
-            self.editor_load_entry(self.cur_idx())
+    @QtCore.pyqtSlot(int, str)
+    def handle_collins_suggestion(self, cid: int, suggestion: str):
+        self.data.get(cid).suggestion = suggestion
+        if self.cur_cid() == cid:
+            self.editor_load_entry(self.cur_cid())
 
     # ================================ Data Manager Related Slots ================================
 
     @QtCore.pyqtSlot(int, bool)
-    def handle_record_insertion(self, idx: int, batch_loading: bool):
-        subject = self.data.get(idx)["subject"]
-        self.entryList.selectionModel().blockSignals(True)  # -------- entryList signals blocked -------->
-        self.entryList.insertItem(idx, subject)
+    def handle_record_insertion(self, cid: int, batch_loading: bool):
+        subject = self.data.get(cid).subject
+
+        self.entryList.selectionModel().blockSignals(True)  # --------- entryList signals blocked -------->
+
+        if batch_loading:
+            row = self.entryList.count()
+        else:
+            row = self.entryList.currentRow() + 1  # add item after current row
+        self.entryList.insertItem(row, subject)
+
+        item = self.entryList.item(row)
+        item.setData(QtCore.Qt.UserRole, cid)
+        self.cid_to_item[cid] = item
+
         self.entryList.selectionModel().blockSignals(False)  # <-------- entryList signals unblocked --------
+
         if not batch_loading:
-            self.entryList.setCurrentRow(idx)  # will trigger editor_load_entry()
+            self.entryList.setCurrentRow(row)  # will trigger editor_load_entry()
             self.subject.setFocus()
         else:
-            self.qm.queue(self.data.get(idx)["subject"], self.qm.COLLINS)
+            self.wqv.prefetch_queued(subject, QueryType.COLLINS, cid)
 
     @QtCore.pyqtSlot()
     def update_ui_after_record_count_changed(self):
@@ -209,7 +172,7 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.set_gui_enabled(True)
             self.freqBar.setMaximum(5)
         else:
-            self.editor_block_signals(True)
+            self.editor_block_signals(True)  # --------- editor signals blocked -------->
             self.subject.document().setPlainText("Congratulation!")  # subject change will lead to opening of dictionary
             self.paraphrase.document().setPlainText("There is nothing to be processed.")
             self.extension.document().setPlainText("Great work!")
@@ -217,115 +180,118 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             self.source.document().setPlainText("")
             self.hint.document().setPlainText("")
             self.freqBar.setMaximum(0)
-            self.editor_block_signals(False)
+            self.editor_block_signals(False)  # <-------- editor signals unblocked --------
             self.set_gui_enabled(False)
 
         self.unreadBar.setMaximum(self.data.count())
-        self.unreadBar.setValue(self.data.count(self.data.UNVIEWED) + self.data.count(self.data.TOPROCESS))
+        self.unreadBar.setValue(self.data.count(RecordStatus.UNVIEWED) + self.data.count(RecordStatus.TOPROCESS))
         self.unreadBar.setToolTip("%d unread" % self.unreadBar.value())
         self.confirmedBar.setMaximum(self.data.count())
-        self.confirmedBar.setValue(self.data.count(self.data.CONFIRMED))
+        self.confirmedBar.setValue(self.data.count(RecordStatus.CONFIRMED))
         self.confirmedBar.setToolTip("%d confirmed" % self.confirmedBar.value())
         self.discardBar.setMaximum(self.data.count())
-        self.discardBar.setValue(self.data.count(self.data.DISCARDED))
+        self.discardBar.setValue(self.data.count(RecordStatus.DISCARDED))
         self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
 
     @QtCore.pyqtSlot()
     def handle_record_batch_load_finished(self):
         if self.data.count() > 0:
+            QtCore.QCoreApplication.processEvents()
             self.entryList.setCurrentRow(0)
             self.paraphrase.setFocus()
 
     @QtCore.pyqtSlot()
     def handle_record_clear(self):
-        self.qm.reset()
-        self.entryList.selectionModel().blockSignals(True)
+        self.wqv.reset()
+        self.entryList.selectionModel().blockSignals(True)  # --------- entryList signals blocked -------->
+        self.cid_to_item.clear()
         self.entryList.clear()
         QtCore.QCoreApplication.processEvents()
-        self.entryList.selectionModel().blockSignals(False)
+        self.entryList.selectionModel().blockSignals(False)  # <-------- entryList signals unblocked --------
 
-    @QtCore.pyqtSlot(int, int, int)
-    def handle_record_status_changed(self, idx: int, _: int, new_status: int):
+    @QtCore.pyqtSlot(int, RecordStatus, RecordStatus)
+    def handle_record_status_changed(self, cid: int, old_status: RecordStatus, new_status: RecordStatus):
         f = self.entryList.font()
-        if new_status == self.data.TOPROCESS:
-            f.setItalic(False)
-            f.setStrikeOut(False)
-        elif new_status == self.data.CONFIRMED:
+        if new_status == RecordStatus.CONFIRMED:
             f.setItalic(True)
             f.setStrikeOut(False)
-        elif new_status == self.data.DISCARDED:
+            self.wqv.discard_by_cid(cid)
+        elif new_status == RecordStatus.DISCARDED:
             f.setItalic(False)
             f.setStrikeOut(True)
-        self.entryList.item(idx).setFont(f)
+            self.wqv.discard_by_cid(cid)
+        else:
+            f.setItalic(False)
+            f.setStrikeOut(False)
+        self.cid_to_item[cid].setFont(f)
 
     # ================================ Data Related Helper Functions ================================
 
-    def cur_idx(self):
-        return self.entryList.currentRow()
+    def cur_cid(self) -> Optional[int]:
+        item = self.entryList.currentItem()
+        if item is None:
+            return None
+        else:
+            return item.data(QtCore.Qt.UserRole)
 
-    def cur_record(self):
-        return self.data.get(self.cur_idx())
+    def cur_record(self) -> Optional[Record]:
+        cid = self.cur_cid()
+        if cid is None:
+            return None
+        else:
+            return self.data.get(cid)
 
     # ================================ UI Helper Functions ================================
 
-    def editor_load_entry(self, idx):
-        assert 0 <= idx <= self.data.count(), "Invalid index"
-
-        r = self.data.get(idx)
+    def editor_load_entry(self, cid: int) -> None:
+        r = self.data.get(cid)
 
         self.editor_block_signals(True)  # -------- main editor signals blocked -------->
 
-        self.subject.document().setPlainText(r["subject"])
-
-        if r["pron"] == "Samantha":
+        self.subject.document().setPlainText(r.subject)
+        if r.pronunciation == "Samantha":
             self.pronSamantha.toggle()  # only change UI display but not triggering pronunciation
-        elif r["pron"] == "Daniel":
-            self.pronDaniel.toggle()
-
-        self.freqBar.setValue(r["freq"])
-        self.freqBar.setToolTip(r["tips"])
-        self.checkR.setChecked("R" in r["card"])
-        self.checkS.setChecked("S" in r["card"])
-        self.checkD.setChecked("D" in r["card"])
-
-        self.paraphrase.document().setHtml(r["para"])
-        self.extension.document().setHtml(r["ext"])
-        self.example.document().setHtml(r["usage"])
-        self.checkSource.setChecked(r["source_enabled"])
-        self.source.document().setHtml(r["source"])
-        self.source.setEnabled(r["source_enabled"])
-        self.hint.document().setPlainText(r["hint"])
-
-        if r["img"]:
-            self.imageLabel.setPixmap(r["img"])
+        elif r.pronunciation == "Daniel":
+            self.pronDaniel.toggle()    # only change UI display but not triggering pronunciation
+        self.freqBar.setValue(r.freq)
+        self.freqBar.setToolTip(r.freq_note)
+        self.checkR.setChecked("R" in r.cards)
+        self.checkS.setChecked("S" in r.cards)
+        self.checkD.setChecked("D" in r.cards)
+        self.paraphrase.document().setHtml(r.paraphrase)
+        self.extension.document().setHtml(r.extension)
+        self.example.document().setHtml(r.example)
+        self.checkSource.setChecked(r.source_enabled)
+        self.source.setEnabled(r.source_enabled)
+        self.source.document().setHtml(r.source)
+        self.hint.document().setPlainText(r.hint)
+        if r.image is not None:
+            self.imageLabel.setPixmap(r.image)
         else:
             self.imageLabel.setText("Click \nto paste \nimage")
-
-        suggestion = r.get("suggestion")
-        if suggestion is not None and suggestion != r["subject"]:
-            self.subjectSuggest.setText("Suggest: " + suggestion)
+        if r.suggestion is not None:
+            self.subjectSuggest.setText("Suggest: " + r.suggestion)
             self.subjectSuggest.setVisible(True)
         else:
             self.subjectSuggest.setVisible(False)
 
         self.editor_block_signals(False)  # <-------- main editor signals unblocked --------
 
-    def move_to_next(self):
-        self.qm.discard_by_subject(self.cur_record()["subject"])
-        suggestion = self.cur_record().get("suggestion")
-        if suggestion is not None and suggestion != self.cur_record()["subject"]:
-            self.qm.discard_by_subject(suggestion)
-        if self.cur_idx() < self.data.count() - 1:
-            self.entryList.setCurrentRow(self.cur_idx() + 1)
-            # Loading data will be completed by selected_changed()
-        elif self.cur_idx() == self.data.count() - 1:
+    def move_to_next(self) -> None:
+        # Discard by cid will be performed by record_status_changed signal
+        if self.entryList.currentRow() < self.entryList.count() - 1:
+            self.entryList.selectionModel().blockSignals(True)  # --------- entryList signals blocked -------->
+            self.entryList.setCurrentRow(self.entryList.currentRow() + 1)
+            self.selected_changed(query_immediately=False)  # delay query
+            self.entryList.selectionModel().blockSignals(False)  # <-------- entryList signals unblocked --------
+        else:
             self.add_new_entry_clicked()
 
-    def set_gui_enabled(self, value):
+    def set_gui_enabled(self, value: bool) -> None:
         for component in [self.confirmButton, self.discardButton] + self.editor_components:
             component.setEnabled(value)
 
-    def editor_block_signals(self, value):
+    def editor_block_signals(self, value: bool) -> None:
         for component in self.editor_components:
             component.blockSignals(value)
 
@@ -336,9 +302,9 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             key = event.key()
             if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
                 if (widget is self.subject) or (widget is self.paraphrase and self.paraphrase.toPlainText() == ""):
-                    self.data.set_status(self.cur_idx(), self.data.UNVIEWED)
+                    self.data.set_status(self.cur_cid(), RecordStatus.UNVIEWED)
                     self.selected_changed(query_immediately=True)
-                    return True
+                    return True  # discard the return key
             elif key == QtCore.Qt.Key_B and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + B
                 if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
                     widget: QtWidgets.QTextEdit
@@ -361,84 +327,80 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def confirm_clicked(self):
-        self.data.set_status(self.cur_idx(), self.data.CONFIRMED)
+        self.data.set_status(self.cur_cid(), RecordStatus.CONFIRMED)
         self.move_to_next()
 
     @QtCore.pyqtSlot()
     def discard_clicked(self):
-        self.data.set_status(self.cur_idx(), self.data.DISCARDED)
+        self.data.set_status(self.cur_cid(), RecordStatus.DISCARDED)
         self.move_to_next()
 
     @QtCore.pyqtSlot()
-    def selected_changed(self, query_immediately: bool = False):
-        self.editor_load_entry(self.cur_idx())
-
+    def selected_changed(self, query_immediately: bool = True):
+        self.editor_load_entry(self.cur_cid())
         r = self.cur_record()
-        if not self.is_saving:
-            if r["subject"] != "":
-                if r["status"] == self.data.UNVIEWED:
-                    self.pronSamantha.click()  # including toggling and first-time pronouncing
-                    self.data.set_status(self.cur_idx(), self.data.TOPROCESS)
-                if not query_immediately:
-                    self.qm.delay_request(r["subject"], self.qm.COLLINS)
-                else:
-                    self.qm.request(r["subject"], self.qm.COLLINS)
-                    self.handle_delay_request_activated(r["subject"], self.qm.COLLINS)
+        if r.subject != "":
+            if r.status == RecordStatus.UNVIEWED:
+                self.pronSamantha.click()  # including toggling and first-time pronouncing
+                self.data.set_status(self.cur_cid(), RecordStatus.TOPROCESS)
+            if query_immediately or self.wqv.has_prefetched(r.subject, QueryType.COLLINS, r.cid):
+                self.wqv.request(r.subject, QueryType.COLLINS, r.cid)
+            else:
+                self.wqv.delay_request(r.subject, QueryType.COLLINS, r.cid)
 
     @QtCore.pyqtSlot()
     def pron_clicked(self):
-        sender = self.sender()
-        sender: QtWidgets.QRadioButton
-        if sender:
-            DataExporter.pronounce(self.cur_record()["subject"], sender.text())
-            self.cur_record()["pron"] = sender.text()
+        sender: QtWidgets.QRadioButton = cast(QtWidgets.QRadioButton, self.sender())
+        self.data.pronounce(self.cur_record().subject, sender.text())
+        self.cur_record().pronunciation = sender.text()
 
     @QtCore.pyqtSlot()
     def subject_changed(self):
-        self.qm.discard_by_subject(self.cur_record()["subject"])  # discard queries on original subject
+        # No need to discard wqv queries as all queries associated with the cid will be discarded at once later
         subject = self.subject.toPlainText()
-        self.cur_record()["subject"] = subject
-        self.entryList.item(self.cur_idx()).setText(subject)
+        self.cur_record().subject = subject
+        self.entryList.currentItem().setText(subject)
+        # Do not query automatically. Wait for Return key.
 
     @QtCore.pyqtSlot()
     def suggest_clicked(self):
-        suggestion = self.cur_record()["suggestion"]
-        assert suggestion == self.subjectSuggest.text()[len("Suggest: "):], "Suggestion inconsistent"
-        self.qm.apply_suggestion(self.cur_record()["subject"], suggestion)
+        suggestion = self.cur_record().suggestion
+
+        self.subject.blockSignals(True)  # --------- subject signals blocked --------->
         self.subject.setPlainText(suggestion)
-        # Trigger subject_changed() to discard query workers of original subject
-        # But Collins worker won't get discarded since its worker info have been updated when generating suggestion
-
-        # Trigger GOOGLE_IMAGE query
-        self.handle_delay_request_activated(suggestion, self.qm.COLLINS)
-
+        self.subject.blockSignals(False)  # <-------- subject signals unblocked --------
         self.subjectSuggest.setVisible(False)
+
+        # wqv COLLINS query is correct as the suggestion comes from its URL
+        # New GOOGLE_IMAGE query will be issued as paraphrase changes
 
     @QtCore.pyqtSlot()
     def paraphrase_changed(self):
-        self.cur_record()["para"] = self.paraphrase.toHtml()
+        self.cur_record().paraphrase = self.paraphrase.toHtml()
+        # Trigger GOOGLE_IMAGE prefetch when paraphrase changes
+        self.wqv.prefetch_immediately(self.cur_record().subject, QueryType.GOOGLE_IMAGE, self.cur_cid())
 
     @QtCore.pyqtSlot()
     def extension_changed(self):
-        self.cur_record()["ext"] = self.extension.toHtml()
+        self.cur_record().extension = self.extension.toHtml()
 
     @QtCore.pyqtSlot()
     def example_changed(self):
-        self.cur_record()["usage"] = self.example.toHtml()
+        self.cur_record().example = self.example.toHtml()
 
     @QtCore.pyqtSlot()
     def source_changed(self):
-        self.cur_record()["source"] = self.source.toHtml()
+        self.cur_record().source = self.source.toHtml()
 
     @QtCore.pyqtSlot()
     def source_check_changed(self):
         self.source.setEnabled(self.checkSource.isChecked())
-        self.cur_record()["source_enabled"] = self.checkSource.isChecked()
-        self.source.setHtml('<div align="right">' + self.source.toHtml() + '</div>')
+        self.cur_record().source_enabled = self.checkSource.isChecked()
+        self.source.setHtml('<div align="right">' + self.source.toHtml() + '</div>')  # triggers source_changed signal
 
     @QtCore.pyqtSlot()
     def hint_changed(self):
-        self.cur_record()["hint"] = self.hint.toPlainText()
+        self.cur_record().hint = self.hint.toPlainText()
 
     @QtCore.pyqtSlot()
     def image_clicked(self, event):
@@ -447,14 +409,14 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
             if mine_data.hasImage():
                 px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height(),
                                                                          mode=QtCore.Qt.SmoothTransformation)
-                self.cur_record()["img"] = px
+                self.cur_record().image = px
                 self.imageLabel.setPixmap(px)
         elif event.button() == QtCore.Qt.RightButton:
             self.query_google_images_clicked()
 
     @QtCore.pyqtSlot()
     def image_double_clicked(self, event):
-        self.cur_record()["img"] = None
+        self.cur_record().image = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
     @QtCore.pyqtSlot()
@@ -464,13 +426,13 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def load_csv_clicked(self) -> None:
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        csv_file, _ = QFileDialog.getOpenFileName(self,
-                                                  "Select the CSV file",
-                                                  CSV_DEFAULT_DIRECTORY,
-                                                  "CSV Files (*.csv);;All Files (*)",
-                                                  options=options)
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        csv_file, _ = QtWidgets.QFileDialog.getOpenFileName(self,
+                                                            "Select the CSV file",
+                                                            CSV_DEFAULT_DIRECTORY,
+                                                            "CSV Files (*.csv);;All Files (*)",
+                                                            options=options)
         if csv_file:
             if not self.data.reload_csv_data(csv_file):
                 self.report_error("Failed to load CSV file.")
@@ -489,37 +451,23 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
         msg_box.exec_()
 
     @QtCore.pyqtSlot()
-    def freq_bar_double_clicked(self):
-        self.query_collins_clicked()
-
-    @QtCore.pyqtSlot()
     def confirm_and_smart_duplicate_entry(self):
-        self.data.set_status(self.cur_idx(), self.data.CONFIRMED)
+        self.data.set_status(self.cur_cid(), RecordStatus.CONFIRMED)
         self.smart_duplicate_entry()
 
     @QtCore.pyqtSlot()
     def smart_duplicate_entry(self):
         cursor = self.example.textCursor()
         selection = cursor.selectedText()
-        if selection == "":
-            return
         r = self.cur_record()
-        self.data.add_new_single_entry(self.cur_idx() + 1,
-                                       selection,
+        self.data.add_new_single_entry(selection,
                                        self.example.toPlainText().replace(selection, '<b>%s</b>' % selection),
-                                       r["source_enabled"],
-                                       r["source"])
+                                       r.source_enabled,
+                                       r.source)
 
     @QtCore.pyqtSlot()
     def add_new_entry_clicked(self):
-        if self.app.keyboardModifiers() == QtCore.Qt.ShiftModifier and self.cur_idx() != -1:
-            self.data.add_new_single_entry(self.cur_idx() + 1,
-                                           "",
-                                           self.cur_record()["usage"],
-                                           self.cur_record()["source_enabled"],
-                                           self.cur_record()["source"])
-        else:
-            self.data.add_new_single_entry(self.cur_idx() + 1)
+        self.data.add_new_single_entry()
 
     @QtCore.pyqtSlot()
     def clear_list_clicked(self):
@@ -527,33 +475,33 @@ class MapleUtility(QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def card_type_changed(self):
-        self.cur_record()["card"] = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
-                                                "S" if self.checkS.isChecked() else "",
-                                                "D" if self.checkD.isChecked() else "")
+        self.cur_record().cards = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
+                                              "S" if self.checkS.isChecked() else "",
+                                              "D" if self.checkD.isChecked() else "")
 
     @QtCore.pyqtSlot()
     def query_collins_clicked(self):
-        self.qm.request(self.cur_record()["subject"], self.qm.COLLINS)
+        self.wqv.request(self.cur_record().subject, QueryType.COLLINS, self.cur_cid())
 
     @QtCore.pyqtSlot()
     def query_google_images_clicked(self):
-        self.qm.request(self.cur_record()["subject"], self.qm.GOOGLE_IMAGE)
+        self.wqv.request(self.cur_record().subject, QueryType.GOOGLE_IMAGE, self.cur_cid())
 
     @QtCore.pyqtSlot()
     def query_google_translate_clicked(self):
-        self.qm.request(self.cur_record()["subject"], self.qm.GOOGLE_TRANSLATE)
+        self.wqv.request(self.cur_record().subject, QueryType.GOOGLE_TRANSLATE, self.cur_cid())
 
     @QtCore.pyqtSlot()
     def query_google_clicked(self):
-        self.qm.request(self.cur_record()["subject"], self.qm.GOOGLE)
+        self.wqv.request(self.cur_record().subject, QueryType.GOOGLE, self.cur_cid())
 
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     script_dir = os.path.dirname(os.path.realpath(__file__))
     app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
 
-    mapleUtility = MapleUtility(app)
+    mapleUtility = MapleUtility()
     mapleUtility.showMaximized()
 
     sys.exit(app.exec_())
