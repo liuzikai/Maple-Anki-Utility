@@ -100,6 +100,7 @@ class QueryWorker(QtWidgets.QWidget):
         # self._working_on_query will be cleared by signal
 
     def free(self) -> None:
+        self._working_on_query = False
         self._webview.stop()
         self._query = None
 
@@ -290,6 +291,7 @@ class WebQueryView(QtWidgets.QWidget):
             self._active_worker.stop()
 
     def reset(self) -> None:
+        self._queue.clear()  # clear this first to avoid any new prefetch
         self._set_active_worker(None)
         for worker in self._workers:
             worker.free()
