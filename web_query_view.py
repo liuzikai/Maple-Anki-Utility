@@ -337,15 +337,17 @@ class WebQueryView(QtWidgets.QWidget):
     def _issue_prefetch(self):
         if len(self._queue) == 0:
             return  # nothing to prefetch
+
+        worker = self._get_a_free_worker()
+        if worker is None:
+            return  # prefetch only if there is a free worker
+
         query = self._queue.popleft()
 
         # Check whether there is a worker working on the query
         if self._search_worker_working_on_query(query) is not None:
             return
 
-        worker = self._get_a_free_worker()
-        if worker is None:
-            return  # prefetch only if there is a free worker
         worker.start(query)
 
     def _get_a_free_worker(self) -> Optional[QueryWorker]:
