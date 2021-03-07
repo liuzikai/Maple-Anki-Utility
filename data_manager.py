@@ -34,6 +34,7 @@ class Record:
     freq_note: str = ""
     cards: str = "R"
     suggestion: Optional[str] = None
+    saved_as_subject: Optional[str] = None
 
 
 class DataManager(QtCore.QObject):
@@ -178,9 +179,10 @@ class DataManager(QtCore.QObject):
             if self._db is not None and r.db_id is not None:
                 self._db.set_word_mature(r.db_id, 0)  # retract db status
 
-        if old_status == RecordStatus.CONFIRMED:
+        if old_status == RecordStatus.CONFIRMED:  # regardless of new status
             if self._exporter is not None:
-                self._exporter.retract_subject(r.subject)
+                self._exporter.retract_subject(r.saved_as_subject)
+                r.saved_as_subject = None
 
         self._counts[old_status] -= 1
         r.status = status
@@ -233,6 +235,8 @@ class DataManager(QtCore.QObject):
                                    "1" if "R" in r.cards else "",
                                    "1" if "S" in r.cards else "",
                                    "1" if "D" in r.cards else "")
+
+        r.saved_as_subject = r.subject
 
     def add_new_single_entry(self, subject: str = "", example: str = "", source_enabled: bool = False,
                              source: str = '<div align="right" style="font-size:12px"></div>') -> int:

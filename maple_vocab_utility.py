@@ -356,19 +356,24 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def subject_changed(self):
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+
         # No need to discard wqv queries as all queries associated with the cid will be discarded at once later
         subject = self.subject.toPlainText()
-        self.cur_record().subject = subject
+        r.subject = subject
         self.entryList.currentItem().setText(subject)
         # Do not query automatically. Wait for Return key.
 
     @QtCore.pyqtSlot()
     def suggest_clicked(self):
-        suggestion = self.cur_record().suggestion
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
 
-        self.subject.blockSignals(True)  # --------- subject signals blocked --------->
-        self.subject.setPlainText(suggestion)
-        self.subject.blockSignals(False)  # <-------- subject signals unblocked --------
+        suggestion = r.suggestion
+        self.subject.setPlainText(suggestion)  # will trigger subject_changed
         self.subjectSuggest.setVisible(False)
 
         # wqv COLLINS query is correct as the suggestion comes from its URL
@@ -376,47 +381,72 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def paraphrase_changed(self):
-        self.cur_record().paraphrase = self.paraphrase.toHtml()
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+
+        r.paraphrase = self.paraphrase.toHtml()
         # Trigger GOOGLE_IMAGE prefetch when paraphrase changes
-        self.wqv.prefetch_immediately(self.cur_record().subject, QueryType.GOOGLE_IMAGE, self.cur_cid())
+        self.wqv.prefetch_immediately(r.subject, QueryType.GOOGLE_IMAGE, r.cid)
 
     @QtCore.pyqtSlot()
     def extension_changed(self):
-        self.cur_record().extension = self.extension.toHtml()
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r.extension = self.extension.toHtml()
 
     @QtCore.pyqtSlot()
     def example_changed(self):
-        self.cur_record().example = self.example.toHtml()
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r.example = self.example.toHtml()
 
     @QtCore.pyqtSlot()
     def source_changed(self):
-        self.cur_record().source = self.source.toHtml()
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r.source = self.source.toHtml()
 
     @QtCore.pyqtSlot()
     def source_check_changed(self):
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
         self.source.setEnabled(self.checkSource.isChecked())
-        self.cur_record().source_enabled = self.checkSource.isChecked()
+        r.source_enabled = self.checkSource.isChecked()
         self.source.setHtml('<div align="right">' + self.source.toHtml() + '</div>')  # triggers source_changed signal
 
     @QtCore.pyqtSlot()
     def hint_changed(self):
-        self.cur_record().hint = self.hint.toPlainText()
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r.hint = self.hint.toPlainText()
 
     @QtCore.pyqtSlot()
     def image_clicked(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             mine_data = app.clipboard().mimeData()
             if mine_data.hasImage():
+                r = self.cur_record()
+                if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+                    self.data.set_status(r.cid, RecordStatus.TOPROCESS)
                 px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height(),
                                                                          mode=QtCore.Qt.SmoothTransformation)
-                self.cur_record().image = px
+                r.image = px
                 self.imageLabel.setPixmap(px)
         elif event.button() == QtCore.Qt.RightButton:
             self.query_google_images_clicked()
 
     @QtCore.pyqtSlot()
     def image_double_clicked(self, event):
-        self.cur_record().image = None
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r.image = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
     @QtCore.pyqtSlot()
