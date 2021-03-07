@@ -247,8 +247,8 @@ class DataManager(QtCore.QObject):
             source=source
         ))
 
-        self.record_inserted.emit(cid, False)
         self._counts[RecordStatus.UNVIEWED] += 1
+        self.record_inserted.emit(cid, False)
         self.record_count_changed.emit()
         return cid
 
