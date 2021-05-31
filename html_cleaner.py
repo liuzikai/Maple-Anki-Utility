@@ -45,19 +45,19 @@ def clean_html(h: str) -> str:
         ret = ret[:-4]
 
     # Verification
-    cleaned_ret = html2text(h).replace("\n", "").replace("**", "").replace(" ", "").replace("_", "")
-    reference = html2text(ret).replace("\n", "").replace("**", "").replace(" ", "").replace("_", "")
-    if cleaned_ret != reference:
-        with open("html_cleaner.log", "w", encoding="utf-8") as f:
-            f.write("================ Original ================\n")
-            f.write(h)
-            f.write("\n================ clean_html ================\n")
-            f.write(ret)
-            f.write("\n================ html2text(h).strip() ================\n")
-            f.write(cleaned_ret)
-            f.write("\n================ html2text(ret).strip() ================\n")
-            f.write(reference)
-        raise RuntimeError("html_cleaner verification failure")
+    # cleaned_ret = html2text(h).replace("\n", "").replace("**", "").replace(" ", "").replace("_", "")
+    # reference = html2text(ret).replace("\n", "").replace("**", "").replace(" ", "").replace("_", "")
+    # if cleaned_ret != reference:
+    #     with open("html_cleaner.log", "w", encoding="utf-8") as f:
+    #         f.write("================ Original ================\n")
+    #         f.write(h)
+    #         f.write("\n================ ret ================\n")
+    #         f.write(ret)
+    #         f.write("\n================ html2text(h).strip() ================\n")
+    #         f.write(cleaned_ret)
+    #         f.write("\n================ html2text(ret).strip() ================\n")
+    #         f.write(reference)
+    #     raise RuntimeError("html_cleaner verification failure")
 
     return ret
 
@@ -92,5 +92,13 @@ p, li { white-space: pre-wrap; }
 p, li { white-space: pre-wrap; }
 </style></head><body style=" font-family:'.AppleSystemUIFont'; font-size:13pt; font-weight:400; font-style:normal;">
 <p align="right" style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-size:12px;">123,</span><span style=" font-size:12px; font-style:italic;">223</span></p></body></html>"""))
+
+    print("================================================================")
+
+    print(clean_html("""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
+<html><head><meta name="qrichtext" content="1" /><style type="text/css">
+p, li { white-space: pre-wrap; }
+</style></head><body style=" font-family:'.AppleSystemUIFont'; font-size:20pt; font-weight:400; font-style:normal;">
+<p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">adj.&amp;cn. required, necessary.</p></body></html>"""))
 
     print("================================================================")
