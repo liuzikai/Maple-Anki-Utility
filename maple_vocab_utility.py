@@ -457,7 +457,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     @QtCore.pyqtSlot()
     def load_csv_clicked(self) -> None:
         options = QtWidgets.QFileDialog.Options()
-        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        # options |= QtWidgets.QFileDialog.DontUseNativeDialog
         csv_file, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                             "Select the CSV file",
                                                             CSV_DEFAULT_DIRECTORY,
