@@ -53,7 +53,7 @@
        <item>
         <widget class="QLabel" name="label_7">
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:600;&quot;&gt;Stay hungry,&amp;nbsp;stay foolish.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:600;&quot;&gt;Stay hungry.&amp;nbsp;Stay foolish.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
         </widget>
        </item>
@@ -62,39 +62,65 @@
          <property name="title">
           <string/>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_4">
-          <property name="spacing">
-           <number>8</number>
+         <layout class="QGridLayout" name="gridLayout">
+          <property name="leftMargin">
+           <number>0</number>
           </property>
-          <item>
-           <widget class="QPushButton" name="loadKindle">
-            <property name="text">
-             <string>Kindle Database</string>
-            </property>
-           </widget>
-          </item>
-          <item>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item row="3" column="1">
            <widget class="QPushButton" name="loadCSV">
             <property name="text">
-             <string>CSV List</string>
+             <string>CSV</string>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="3" column="0">
+           <widget class="QPushButton" name="loadKindle">
+            <property name="text">
+             <string>Kindle</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QRadioButton" name="englishMode">
+            <property name="text">
+             <string>English</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QRadioButton" name="deutschMode">
+            <property name="text">
+             <string>Deutsch</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
            <widget class="QPushButton" name="loadThings">
             <property name="text">
-             <string>Things List</string>
+             <string>Things</string>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="5" column="1">
            <widget class="QPushButton" name="newEntry">
             <property name="text">
-             <string>New Single Entry</string>
+             <string>New</string>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="6" column="0" colspan="2">
            <widget class="QPushButton" name="clearList">
             <property name="text">
              <string>Clear </string>
@@ -444,14 +470,14 @@ QProgressBar::chunk {
            <number>0</number>
           </property>
           <item>
-           <widget class="QRadioButton" name="pronSamantha">
+           <widget class="QRadioButton" name="pronA">
             <property name="text">
              <string>Samantha</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QRadioButton" name="pronDaniel">
+           <widget class="QRadioButton" name="pronB">
             <property name="text">
              <string>Daniel</string>
             </property>

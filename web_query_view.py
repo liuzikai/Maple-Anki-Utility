@@ -21,6 +21,13 @@ class Query:
     cid: int  # card id
 
 
+QuerySettings = {
+    "CollinsDirectory": "english",
+    "TranslateFrom": "en",
+    "TranslateTo": "zh-CN"
+}
+
+
 class QueryWorker(QtWidgets.QWidget):
     """
     A worker for queries.
@@ -33,15 +40,9 @@ class QueryWorker(QtWidgets.QWidget):
     progress_changed = QtCore.pyqtSignal(int)  # progress, -1 for completed
 
     collins_suggestion_retrieved = QtCore.pyqtSignal(Query, str)  # query, suggestion
-    collins_freq_retrieved = QtCore.pyqtSignal(Query, int, str)   # query, freq, freq_note
+    collins_freq_retrieved = QtCore.pyqtSignal(Query, int, str)  # query, freq, freq_note
 
     # Internal constants
-    _URLS = {  # URLs with placeholder
-        QueryType.COLLINS: u"https://www.collinsdictionary.com/dictionary/english/%s",
-        QueryType.GOOGLE_IMAGE: u"https://www.google.com/search?tbm=isch&q=%s",
-        QueryType.GOOGLE_TRANSLATE: u"https://translate.google.com/?sl=en&tl=zh-CN&text=%s",
-        QueryType.GOOGLE: u"https://www.google.com/search?q=%s"
-    }
 
     _MAC_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Safari/605.1.15"
     _IOS_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
@@ -55,6 +56,18 @@ class QueryWorker(QtWidgets.QWidget):
         """
 
     _TIMEOUT = 20000  # [ms]
+
+    @staticmethod
+    def _get_url(query_type: QueryType, subject: str = "") -> str:
+        if query_type == QueryType.COLLINS:
+            return u"https://www.collinsdictionary.com/dictionary/%s/%s" % (QuerySettings["CollinsDirectory"], subject)
+        elif query_type == QueryType.GOOGLE_IMAGE:
+            return u"https://www.google.com/search?tbm=isch&q=%s" % subject
+        elif query_type == QueryType.GOOGLE_TRANSLATE:
+            return u"https://translate.google.com/?sl=%s&tl=%s&text=%s" % (QuerySettings["TranslateFrom"],
+                                                                           QuerySettings["TranslateTo"], subject)
+        elif query_type == QueryType.GOOGLE:
+            return u"https://www.google.com/search?q=%s" % subject
 
     def __init__(self, parent: Optional['QtWidgets.QWidget'] = None) -> None:
         super().__init__(parent)
@@ -89,7 +102,7 @@ class QueryWorker(QtWidgets.QWidget):
     def start(self, query: Query) -> None:
         """Start a query."""
         self._query = query
-        self._webview.load(QtCore.QUrl(self._URLS[query.query_type] % query.subject))
+        self._webview.load(QtCore.QUrl(self._get_url(query.query_type, query.subject)))
         self._working_on_query = True
         self._timer.start(self._TIMEOUT)
         QtCore.QCoreApplication.processEvents()
@@ -158,8 +171,8 @@ class QueryWorker(QtWidgets.QWidget):
         :param url:
         :return:
         """
-        if url.startswith(QueryWorker._URLS[QueryType.COLLINS][:-2]):
-            ret = url[len(QueryWorker._URLS[QueryType.COLLINS][:-2]):]
+        if url.startswith(QueryWorker._get_url(QueryType.COLLINS)):
+            ret = url[len(QueryWorker._get_url(QueryType.COLLINS)):]
             if ret.find("?") != -1:
                 ret = ret[:ret.find("?")]
             return ret
@@ -196,14 +209,14 @@ class WebQueryView(QtWidgets.QWidget):
     """A container managing multiple QWebEngineViews."""
 
     usage_updated = QtCore.pyqtSignal(int, int, int)  # finished, working, free
-    active_worker_progress = QtCore.pyqtSignal(int)   # progress (-1 for completed or no active worker)
+    active_worker_progress = QtCore.pyqtSignal(int)  # progress (-1 for completed or no active worker)
 
     collins_suggestion_retrieved = QtCore.pyqtSignal(int, str)  # cid, suggestion
-    collins_freq_retrieved = QtCore.pyqtSignal(int, int, str)   # cid, freq, freq_note
+    collins_freq_retrieved = QtCore.pyqtSignal(int, int, str)  # cid, freq, freq_note
 
     _PREFETCH_LENGTH = 5
     _PREFETCH_ISSUE_INTERVAL = 5000  # [ms]
-    _DELAY_REQUEST_TIME = 2000       # [ms]
+    _DELAY_REQUEST_TIME = 2000  # [ms]
 
     def __init__(self, parent: Optional['QtWidgets.QWidget'] = None) -> None:
 

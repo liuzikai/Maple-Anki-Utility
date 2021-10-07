@@ -8,7 +8,7 @@ from typing import Optional, Dict, cast
 from PyQt5 import QtCore, QtWidgets, QtGui
 from data_manager import DataManager, Record, RecordStatus
 from maple_utility import Ui_MapleUtility
-from web_query_view import WebQueryView, QueryType
+from web_query_view import WebQueryView, QueryType, QuerySettings
 
 # KINDLE_DB_FILENAME = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/resource/test_vocab.db"
 KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab.db"
@@ -36,8 +36,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.subject.installEventFilter(self)  # response to Return key
         self.subjectSuggest.setVisible(False)
         self.subjectSuggest.clicked.connect(self.suggest_clicked)
-        self.pronSamantha.clicked.connect(self.pron_clicked)
-        self.pronDaniel.clicked.connect(self.pron_clicked)
+        self.pronA.clicked.connect(self.pron_clicked)
+        self.pronB.clicked.connect(self.pron_clicked)
         self.paraphrase.textChanged.connect(self.paraphrase_changed)
         self.paraphrase.installEventFilter(self)  # response to Ctrl + I/B
         self.extension.textChanged.connect(self.extension_changed)
@@ -64,6 +64,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         # There is no mouse signal for label. Override functions.
         self.imageLabel.mousePressEvent = self.image_clicked
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
+        self.englishMode.clicked.connect(self.change_to_english_mode)
+        self.deutschMode.clicked.connect(self.change_to_deutsch_mode)
         self.loadKindle.clicked.connect(self.load_kindle_clicked)
         self.loadCSV.clicked.connect(self.load_csv_clicked)
         self.loadThings.clicked.connect(self.load_things_clicked)
@@ -77,7 +79,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.queryGoogleTranslate.clicked.connect(self.query_google_translate_clicked)
         self.queryGoogle.clicked.connect(self.query_google_clicked)
         self.webLoadingView.setVisible(False)
-        self.editor_components = [self.subject, self.subjectSuggest, self.freqBar, self.pronSamantha, self.pronDaniel,
+        self.editor_components = [self.subject, self.subjectSuggest, self.freqBar, self.pronA, self.pronB,
                                   self.paraphrase, self.imageLabel, self.extension, self.example, self.checkSource,
                                   self.source, self.hint, self.checkR, self.checkS, self.checkD,
                                   self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
@@ -249,10 +251,10 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.editor_block_signals(True)  # -------- main editor signals blocked -------->
 
         self.subject.document().setPlainText(r.subject)
-        if r.pronunciation == "Samantha":
-            self.pronSamantha.toggle()  # only change UI display but not triggering pronunciation
+        if r.pronunciation == "Samantha" or r.pronunciation == "Anna":
+            self.pronA.toggle()  # only change UI display but not triggering pronunciation
         elif r.pronunciation == "Daniel":
-            self.pronDaniel.toggle()    # only change UI display but not triggering pronunciation
+            self.pronB.toggle()  # only change UI display but not triggering pronunciation
         self.freqBar.setValue(r.freq)
         self.freqBar.setToolTip(r.freq_note)
         self.checkR.setChecked("R" in r.cards)
@@ -326,6 +328,26 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         return QtWidgets.QWidget.eventFilter(self, widget, event)
 
     @QtCore.pyqtSlot()
+    def change_to_english_mode(self):
+        global THINGS_VOCAB_LIST
+        THINGS_VOCAB_LIST = "English Quick List"
+        self.pronA.setText("Samantha")
+        self.pronB.setVisible(True)
+        QuerySettings["CollinsDirectory"] = "english"
+        QuerySettings["TranslateFrom"] = "en"
+        QuerySettings["TranslateTo"] = "zh-CN"
+
+    @QtCore.pyqtSlot()
+    def change_to_deutsch_mode(self):
+        global THINGS_VOCAB_LIST
+        THINGS_VOCAB_LIST = "Deutsch schnell Liste"
+        self.pronA.setText("Anna")
+        self.pronB.setVisible(False)
+        QuerySettings["CollinsDirectory"] = "german-english"
+        QuerySettings["TranslateFrom"] = "de"
+        QuerySettings["TranslateTo"] = "en"
+
+    @QtCore.pyqtSlot()
     def confirm_clicked(self):
         self.data.set_status(self.cur_cid(), RecordStatus.CONFIRMED)
         self.move_to_next()
@@ -341,7 +363,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         r = self.cur_record()
         if r.subject != "":
             if r.status == RecordStatus.UNVIEWED:
-                self.pronSamantha.click()  # including toggling and first-time pronouncing
+                self.pronA.click()  # including toggling and first-time pronouncing
                 self.data.set_status(self.cur_cid(), RecordStatus.TOPROCESS)
             if query_immediately or self.wqv.has_prefetched(r.subject, QueryType.COLLINS, r.cid):
                 self.wqv.request(r.subject, QueryType.COLLINS, r.cid)
