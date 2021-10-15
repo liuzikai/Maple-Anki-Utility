@@ -255,7 +255,7 @@ class Ui_MapleUtility(object):
         self.label_4.setObjectName("label_4")
         self.verticalLayout_3.addWidget(self.label_4)
         self.extension = QtWidgets.QTextEdit(self.editWidget)
-        self.extension.setMaximumSize(QtCore.QSize(16777215, 60))
+        self.extension.setMaximumSize(QtCore.QSize(16777215, 100))
         font = QtGui.QFont()
         font.setPointSize(20)
         self.extension.setFont(font)
