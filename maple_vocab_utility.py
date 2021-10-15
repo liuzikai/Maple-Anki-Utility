@@ -409,8 +409,9 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
             self.data.set_status(r.cid, RecordStatus.TOPROCESS)
 
         r.paraphrase = self.paraphrase.toHtml()
-        # Trigger GOOGLE_IMAGE prefetch when paraphrase changes
-        self.wqv.prefetch_immediately(r.subject, QueryType.GOOGLE_IMAGE, r.cid)
+        if self.englishMode.isChecked():
+            # Trigger GOOGLE_IMAGE prefetch when paraphrase changes
+            self.wqv.prefetch_immediately(r.subject, QueryType.GOOGLE_IMAGE, r.cid)
 
     @QtCore.pyqtSlot()
     def extension_changed(self):
