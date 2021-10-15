@@ -41,6 +41,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.paraphrase.textChanged.connect(self.paraphrase_changed)
         self.paraphrase.installEventFilter(self)  # response to Ctrl + I/B
         self.extension.textChanged.connect(self.extension_changed)
+        self.extension.installEventFilter(self)  # response to Ctrl + I/B
         self.example.textChanged.connect(self.example_changed)
         self.example.installEventFilter(self)  # response to Ctrl + I/B
         self.checkSource.stateChanged.connect(self.source_check_changed)
@@ -308,7 +309,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
                     self.selected_changed(query_immediately=True)
                     return True  # discard the return key
             elif key == QtCore.Qt.Key.Key_B and event.modifiers() == QtCore.Qt.KeyboardModifier.ControlModifier:  # Ctrl + B
-                if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
+                if widget in [self.paraphrase, self.extension, self.example, self.source]:
                     widget: QtWidgets.QTextEdit
                     cursor = widget.textCursor()
                     fmt = cursor.charFormat()
@@ -318,7 +319,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
                         fmt.setFontWeight(QtGui.QFont.Weight.Bold)
                     cursor.mergeCharFormat(fmt)
             elif key == QtCore.Qt.Key.Key_I and event.modifiers() == QtCore.Qt.KeyboardModifier.ControlModifier:  # Ctrl + I
-                if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
+                if widget in [self.paraphrase, self.extension, self.example, self.source]:
                     widget: QtWidgets.QTextEdit
                     cursor = widget.textCursor()
                     fmt = cursor.charFormat()
