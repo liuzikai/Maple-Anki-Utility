@@ -295,7 +295,7 @@ class WebQueryView(QtWidgets.QWidget):
         self.report_worker_usage()
 
         # Search in queue
-        for query in self._queue:
+        for query in list(self._queue):
             if query.cid == cid:
                 self._queue.remove(query)
 
