@@ -58,7 +58,8 @@ class DataExporter:
         lame_command = " ".join(
             ['lame', '-m', 'm', '"%s"' % self.temp_media_file, '"%s/%s"' % (self.media_path, filename)])
         self.media_proc = subprocess.Popen(say_command + " && " + lame_command,
-                                           shell=True, stdout=subprocess.DEVNULL)  # non-blocking
+                                           shell=True,
+                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # non-blocking
         return filename
 
     @staticmethod

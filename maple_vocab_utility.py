@@ -5,7 +5,7 @@
 import sys
 import os
 from typing import Optional, Dict, cast
-from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt6 import QtCore, QtWidgets, QtGui
 from data_manager import DataManager, Record, RecordStatus
 from maple_utility import Ui_MapleUtility
 from web_query_view import WebQueryView, QueryType, QuerySettings
@@ -48,17 +48,17 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.source.installEventFilter(self)  # response to Ctrl + I/B
         self.hint.textChanged.connect(self.hint_changed)
         # These shortcuts are global
-        self.confirm_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
+        self.confirm_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Return"), self)
         self.confirm_shortcut.activated.connect(self.confirm_clicked)
-        self.confirm_and_smart_duplicate_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Return"), self)
+        self.confirm_and_smart_duplicate_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Return"), self)
         self.confirm_and_smart_duplicate_shortcut.activated.connect(self.confirm_and_smart_duplicate_entry)
         self.confirmButton.setToolTip("Shortcut: Ctrl + Return\nConfirm and smart duplicate: Ctrl + Shift + Return")
-        self.discard_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
+        self.discard_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_clicked)
         self.discardButton.setToolTip("Shortcut: Ctrl + Alt + Return")
-        self.new_entry_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
+        self.new_entry_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
         self.new_entry_shortcut.activated.connect(self.add_new_entry_clicked)
-        self.smart_duplicate_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+N"), self)
+        self.smart_duplicate_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+N"), self)
         self.smart_duplicate_shortcut.activated.connect(self.smart_duplicate_entry)
         self.newEntry.setToolTip("Shortcut: Ctrl + N\nSmart duplicate: Ctrl + Shift + N")
         # There is no mouse signal for label. Override functions.
@@ -157,7 +157,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.entryList.insertItem(row, subject)
 
         item = self.entryList.item(row)
-        item.setData(QtCore.Qt.UserRole, cid)
+        item.setData(QtCore.Qt.ItemDataRole.UserRole, cid)
         self.cid_to_item[cid] = item
 
         self.entryList.selectionModel().blockSignals(False)  # <-------- entryList signals unblocked --------
@@ -234,7 +234,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         if item is None:
             return None
         else:
-            return item.data(QtCore.Qt.UserRole)
+            return item.data(QtCore.Qt.ItemDataRole.UserRole)
 
     def cur_record(self) -> Optional[Record]:
         cid = self.cur_cid()
@@ -300,24 +300,24 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     # ================================ UI Slots and Event Handler ================================
 
     def eventFilter(self, widget, event):
-        if event.type() == QtCore.QEvent.KeyPress:
+        if event.type() == QtCore.QEvent.Type.KeyPress:
             key = event.key()
-            if key == QtCore.Qt.Key_Return or key == QtCore.Qt.Key_Enter:
+            if key == QtCore.Qt.Key.Key_Return or key == QtCore.Qt.Key.Key_Enter:
                 if (widget is self.subject) or (widget is self.paraphrase and self.paraphrase.toPlainText() == ""):
                     self.data.set_status(self.cur_cid(), RecordStatus.UNVIEWED)
                     self.selected_changed(query_immediately=True)
                     return True  # discard the return key
-            elif key == QtCore.Qt.Key_B and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + B
+            elif key == QtCore.Qt.Key.Key_B and event.modifiers() == QtCore.Qt.KeyboardModifier.ControlModifier:  # Ctrl + B
                 if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
                     widget: QtWidgets.QTextEdit
                     cursor = widget.textCursor()
                     fmt = cursor.charFormat()
-                    if fmt.fontWeight() == QtGui.QFont.Bold:
-                        fmt.setFontWeight(QtGui.QFont.Normal)
+                    if fmt.fontWeight() == QtGui.QFont.Weight.Bold:
+                        fmt.setFontWeight(QtGui.QFont.Weight.Normal)
                     else:
-                        fmt.setFontWeight(QtGui.QFont.Bold)
+                        fmt.setFontWeight(QtGui.QFont.Weight.Bold)
                     cursor.mergeCharFormat(fmt)
-            elif key == QtCore.Qt.Key_I and event.modifiers() == QtCore.Qt.ControlModifier:  # Ctrl + I
+            elif key == QtCore.Qt.Key.Key_I and event.modifiers() == QtCore.Qt.KeyboardModifier.ControlModifier:  # Ctrl + I
                 if (widget is self.paraphrase) or (widget is self.example) or (widget is self.source):
                     widget: QtWidgets.QTextEdit
                     cursor = widget.textCursor()
@@ -450,17 +450,17 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def image_clicked(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             mine_data = app.clipboard().mimeData()
             if mine_data.hasImage():
                 r = self.cur_record()
                 if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
                     self.data.set_status(r.cid, RecordStatus.TOPROCESS)
                 px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height(),
-                                                                         mode=QtCore.Qt.SmoothTransformation)
+                                                                         mode=QtCore.Qt.TransformationMode.SmoothTransformation)
                 r.image = px
                 self.imageLabel.setPixmap(px)
-        elif event.button() == QtCore.Qt.RightButton:
+        elif event.button() == QtCore.Qt.MouseButton.RightButton:
             self.query_google_images_clicked()
 
     @QtCore.pyqtSlot()
@@ -478,13 +478,12 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def load_csv_clicked(self) -> None:
-        options = QtWidgets.QFileDialog.Options()
-        # options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        # options = QtWidgets.QFileDialog.Options
+        # options |= QtWidgets.QFileDialog.Options.DontUseNativeDialog
         csv_file, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                             "Select the CSV file",
                                                             CSV_DEFAULT_DIRECTORY,
-                                                            "CSV Files (*.csv);;All Files (*)",
-                                                            options=options)
+                                                            "CSV Files (*.csv);;All Files (*)")
         if csv_file:
             if not self.data.reload_csv_data(csv_file):
                 self.report_error("Failed to load CSV file.")
@@ -556,4 +555,4 @@ if __name__ == '__main__':
     mapleUtility = MapleUtility()
     mapleUtility.showMaximized()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

@@ -3,7 +3,7 @@
 from data_source import *
 from data_exporter import *
 from html_cleaner import *
-from PyQt5 import QtCore, QtGui
+from PyQt6 import QtCore, QtGui
 from typing import Optional, List, Dict
 from dataclasses import dataclass
 from enum import Enum

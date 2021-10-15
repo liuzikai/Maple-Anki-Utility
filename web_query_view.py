@@ -3,7 +3,7 @@ from enum import Enum
 from dataclasses import dataclass
 from collections import deque
 
-from PyQt5 import QtWidgets, QtCore, QtWebEngineWidgets
+from PyQt6 import QtWidgets, QtCore, QtWebEngineWidgets
 from pyquery import PyQuery
 
 
@@ -87,7 +87,7 @@ class QueryWorker(QtWidgets.QWidget):
         self._webview.page().profile().setProperty("X-Frame-Options", "Deny")  # this prevents some ads from loading
 
         # Prevent webView from grabbing focus when calling load() or stop()
-        self._webview.settings().setAttribute(self._webview.settings().FocusOnNavigationEnabled, False)
+        self._webview.settings().setAttribute(self._webview.settings().WebAttribute.FocusOnNavigationEnabled, False)
 
         # Signals
         self._webview.loadStarted.connect(lambda progress=0: self._handle_progress_change(progress))
