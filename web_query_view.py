@@ -63,7 +63,7 @@ class QueryWorker(QtWidgets.QWidget):
 
     @staticmethod
     def _get_url(query_type: QueryType, subject: str = "") -> str:
-        subject = subject.strip()
+        subject = subject.strip().replace(" ", "-")
         if query_type == QueryType.COLLINS:
             return u"https://www.collinsdictionary.com/dictionary/%s/%s" % (QuerySettings["CollinsDirectory"], subject)
         elif query_type == QueryType.GOOGLE_IMAGE:
