@@ -1,0 +1,4 @@
+[submodule "QWebKitView"]
+	path = QWebKitView
+	url = git@github.com:liuzikai/pyqt-macos-native-webview.git
+	branch = main
