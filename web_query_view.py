@@ -3,7 +3,11 @@ from enum import Enum
 from dataclasses import dataclass
 from collections import deque
 
-from PyQt6 import QtWidgets, QtCore, QtWebEngineWidgets
+from PyQt6 import QtWidgets, QtCore
+
+# from PyQt6.QtWebEngineWidgets import QWebEngineView as QWebView
+from QWebKitView import QWebKitView as QWebView
+
 from pyquery import PyQuery
 
 
@@ -59,6 +63,7 @@ class QueryWorker(QtWidgets.QWidget):
 
     @staticmethod
     def _get_url(query_type: QueryType, subject: str = "") -> str:
+        subject = subject.strip()
         if query_type == QueryType.COLLINS:
             return u"https://www.collinsdictionary.com/dictionary/%s/%s" % (QuerySettings["CollinsDirectory"], subject)
         elif query_type == QueryType.GOOGLE_IMAGE:
@@ -77,7 +82,7 @@ class QueryWorker(QtWidgets.QWidget):
         self._working_on_query: bool = False
 
         # Create a QWebEngineView centralized in a QHBoxLayout
-        self._webview: QtWebEngineWidgets.QWebEngineView = QtWebEngineWidgets.QWebEngineView(self)
+        self._webview: QWebView = QWebView(self)
         self._layout = QtWidgets.QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.addWidget(self._webview)
@@ -136,7 +141,7 @@ class QueryWorker(QtWidgets.QWidget):
             # self._query may be None due to async
             if self._query is not None and self._query.query_type == QueryType.COLLINS:
 
-                sender: QtWebEngineWidgets.QWebEngineView = cast(QtWebEngineWidgets.QWebEngineView, self.sender())
+                sender: QWebView= cast(QWebView, self.sender())
 
                 # Clean up page
                 sender.page().runJavaScript(self._COLLINS_POST_JS)
@@ -222,7 +227,7 @@ class WebQueryView(QtWidgets.QWidget):
 
         super().__init__(parent)
 
-        self._layout = QtWidgets.QVBoxLayout(self)
+        self._layout = QtWidgets.QStackedLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
 
         # List of workers
@@ -338,11 +343,8 @@ class WebQueryView(QtWidgets.QWidget):
         Hide the original active worker (if not None), set self._active_worker, make the new active worker visible
         (if not None) and emit active_worker_progress.
         """
-        if self._active_worker is not None:
-            self._active_worker.setVisible(False)
-        self._active_worker = worker
         if worker is not None:
-            worker.setVisible(True)
+            self._layout.setCurrentWidget(worker)
             self.active_worker_progress.emit(worker.get_progress())
         else:
             self.active_worker_progress.emit(-1)
