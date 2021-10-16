@@ -63,18 +63,6 @@
           <string/>
          </property>
          <layout class="QGridLayout" name="gridLayout">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
           <item row="3" column="1">
            <widget class="QPushButton" name="loadCSV">
             <property name="text">
@@ -92,7 +80,7 @@
           <item row="0" column="0">
            <widget class="QRadioButton" name="englishMode">
             <property name="text">
-             <string>English</string>
+             <string>EN</string>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -102,7 +90,7 @@
           <item row="0" column="1">
            <widget class="QRadioButton" name="deutschMode">
             <property name="text">
-             <string>Deutsch</string>
+             <string>DE</string>
             </property>
            </widget>
           </item>

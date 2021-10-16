@@ -271,7 +271,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         if r.image is not None:
             self.imageLabel.setPixmap(r.image)
         else:
-            self.imageLabel.setText("Click \nto paste \nimage")
+            self.imageLabel.setText("Click to\npaste\nimage")
         if r.suggestion is not None:
             self.subjectSuggest.setText("Suggest: " + r.suggestion)
             self.subjectSuggest.setVisible(True)
