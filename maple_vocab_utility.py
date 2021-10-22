@@ -254,7 +254,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.subject.document().setPlainText(r.subject)
         if r.pronunciation == "Samantha" or r.pronunciation == "Anna":
             self.pronA.toggle()  # only change UI display but not triggering pronunciation
-        elif r.pronunciation == "Daniel":
+        elif r.pronunciation == "Daniel" or r.pronunciation == "Markus":
             self.pronB.toggle()  # only change UI display but not triggering pronunciation
         self.freqBar.setValue(r.freq)
         self.freqBar.setToolTip(r.freq_note)
@@ -333,7 +333,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         global THINGS_VOCAB_LIST
         THINGS_VOCAB_LIST = "English Quick List"
         self.pronA.setText("Samantha")
-        self.pronB.setVisible(True)
+        self.pronB.setText("Daniel")
         QuerySettings["CollinsDirectory"] = "english"
         QuerySettings["TranslateFrom"] = "en"
         QuerySettings["TranslateTo"] = "zh-CN"
@@ -343,7 +343,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         global THINGS_VOCAB_LIST
         THINGS_VOCAB_LIST = "Deutsch schnell Liste"
         self.pronA.setText("Anna")
-        self.pronB.setVisible(False)
+        self.pronB.setText("Markus")
         QuerySettings["CollinsDirectory"] = "german-english"
         QuerySettings["TranslateFrom"] = "de"
         QuerySettings["TranslateTo"] = "en"
