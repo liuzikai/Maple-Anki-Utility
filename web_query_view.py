@@ -70,12 +70,12 @@ class QueryWorker(QtWidgets.QWidget):
         if query_type == QueryType.COLLINS:
             return u"https://www.collinsdictionary.com/dictionary/%s/%s" % (QuerySettings["CollinsDirectory"], subject)
         elif query_type == QueryType.GOOGLE_IMAGE:
-            return u"https://www.google.com/search?tbm=isch&q=%s" % subject
+            return u"https://www.google.com/search?tbm=isch&hl=%s&q=%s" % (QuerySettings["TranslateFrom"], subject)
         elif query_type == QueryType.GOOGLE_TRANSLATE:
             return u"https://translate.google.com/?sl=%s&tl=%s&text=%s" % (QuerySettings["TranslateFrom"],
                                                                            QuerySettings["TranslateTo"], subject)
         elif query_type == QueryType.GOOGLE:
-            return u"https://www.google.com/search?q=%s" % subject
+            return u"https://www.google.com/search?hl=%s&q=%s" % (QuerySettings["TranslateFrom"], subject)
 
     def __init__(self, parent: Optional['QtWidgets.QWidget'] = None) -> None:
         super().__init__(parent)
