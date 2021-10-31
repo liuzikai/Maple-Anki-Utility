@@ -21,7 +21,7 @@ ANKI_MEDIA_PATH = "/Users/liuzikai/Library/Application Support/Anki2/liuzikai/co
 class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     """MapleVocabUtility MainWindow."""
 
-    CARD_RD_THRESHOLD = 4
+    MORE_CARDS_THRESHOLD = 4
 
     def __init__(self, parent=None):
 
@@ -109,6 +109,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.cid_to_item: Dict[int, QtWidgets.QListWidgetItem] = {}
 
         # Setup initial UI
+        self.change_to_english_mode()
         self.update_ui_after_record_count_changed()
 
     # ================================ Web Query Related ================================
@@ -129,8 +130,11 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     def set_word_freq(self, cid: int, freq: int, freq_note: str):
         r = self.data.get(cid)
         r.freq = freq
-        if freq >= self.CARD_RD_THRESHOLD:
-            r.cards = "RD"
+        if freq >= self.MORE_CARDS_THRESHOLD:
+            if self.englishMode.isChecked():
+                r.cards = "RD"
+            else:
+                r.cards = "RS"
         else:
             r.cards = "R"
         r.freq_note = freq_note
@@ -526,8 +530,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     def card_type_changed(self):
         r = self.get_cur_record_and_revert_save_if_needed()
         r.cards = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
-                                              "S" if self.checkS.isChecked() else "",
-                                              "D" if self.checkD.isChecked() else "")
+                              "S" if self.checkS.isChecked() else "",
+                              "D" if self.checkD.isChecked() else "")
 
     @QtCore.pyqtSlot()
     def query_collins_clicked(self):
