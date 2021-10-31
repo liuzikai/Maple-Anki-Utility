@@ -1,4 +1,4 @@
-from typing import Optional, Union, List, Deque, cast
+from typing import Optional, Union, List, Deque, Callable, cast
 from enum import Enum
 from dataclasses import dataclass
 from collections import deque
@@ -28,7 +28,8 @@ class Query:
 QuerySettings = {
     "CollinsDirectory": "english",
     "TranslateFrom": "en",
-    "TranslateTo": "zh-CN"
+    "TranslateTo": "zh-CN",
+    "PreprocessSubject": None
 }
 
 
@@ -63,6 +64,8 @@ class QueryWorker(QtWidgets.QWidget):
 
     @staticmethod
     def _get_url(query_type: QueryType, subject: str = "") -> str:
+        if QuerySettings["PreprocessSubject"] is not None:
+            subject = QuerySettings["PreprocessSubject"](subject)
         subject = subject.strip().replace(" ", "-")
         if query_type == QueryType.COLLINS:
             return u"https://www.collinsdictionary.com/dictionary/%s/%s" % (QuerySettings["CollinsDirectory"], subject)
@@ -141,7 +144,7 @@ class QueryWorker(QtWidgets.QWidget):
             # self._query may be None due to async
             if self._query is not None and self._query.query_type == QueryType.COLLINS:
 
-                sender: QWebView= cast(QWebView, self.sender())
+                sender: QWebView = cast(QWebView, self.sender())
 
                 # Clean up page
                 sender.page().runJavaScript(self._COLLINS_POST_JS)

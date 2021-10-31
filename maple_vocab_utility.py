@@ -337,6 +337,14 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         QuerySettings["CollinsDirectory"] = "english"
         QuerySettings["TranslateFrom"] = "en"
         QuerySettings["TranslateTo"] = "zh-CN"
+        QuerySettings["PreprocessSubject"] = None
+
+    @staticmethod
+    def deutsch_mode_preprocess_subject(s: str) -> str:
+        s = s.replace('ä', 'a').replace('ü', 'u').replace('ö', 'o').replace('ß', "ss")
+        if s.startswith("der ") or s.startswith("die ") or s.startswith("das "):
+            s = s[4:]
+        return s
 
     @QtCore.pyqtSlot()
     def change_to_deutsch_mode(self):
@@ -347,6 +355,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         QuerySettings["CollinsDirectory"] = "german-english"
         QuerySettings["TranslateFrom"] = "de"
         QuerySettings["TranslateTo"] = "en"
+        QuerySettings["PreprocessSubject"] = self.deutsch_mode_preprocess_subject
 
     @QtCore.pyqtSlot()
     def confirm_clicked(self):
