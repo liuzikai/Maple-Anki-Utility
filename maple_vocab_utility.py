@@ -380,17 +380,22 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
             else:
                 self.wqv.delay_request(r.subject, QueryType.COLLINS, r.cid)
 
+    def get_cur_record_and_revert_save_if_needed(self):
+        r = self.cur_record()
+        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
+            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        return r
+
     @QtCore.pyqtSlot()
     def pron_clicked(self):
         sender: QtWidgets.QRadioButton = cast(QtWidgets.QRadioButton, self.sender())
         self.data.pronounce(self.cur_record().subject, sender.text())
-        self.cur_record().pronunciation = sender.text()
+        r = self.get_cur_record_and_revert_save_if_needed()
+        r.pronunciation = sender.text()
 
     @QtCore.pyqtSlot()
     def subject_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
 
         # No need to discard wqv queries as all queries associated with the cid will be discarded at once later
         subject = self.subject.toPlainText()
@@ -400,9 +405,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def suggest_clicked(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
 
         suggestion = r.suggestion
         self.subject.setPlainText(suggestion)  # will trigger subject_changed
@@ -413,9 +416,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def paraphrase_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
 
         r.paraphrase = self.paraphrase.toHtml()
         if self.englishMode.isChecked():
@@ -424,39 +425,29 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def extension_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
         r.extension = self.extension.toHtml()
 
     @QtCore.pyqtSlot()
     def example_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
         r.example = self.example.toHtml()
 
     @QtCore.pyqtSlot()
     def source_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
         r.source = self.source.toHtml()
 
     @QtCore.pyqtSlot()
     def source_check_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
         self.source.setEnabled(self.checkSource.isChecked())
         r.source_enabled = self.checkSource.isChecked()
         self.source.setHtml('<div align="right">' + self.source.toHtml() + '</div>')  # triggers source_changed signal
 
     @QtCore.pyqtSlot()
     def hint_changed(self):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
         r.hint = self.hint.toPlainText()
 
     @QtCore.pyqtSlot()
@@ -464,9 +455,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         if event.button() == QtCore.Qt.MouseButton.LeftButton:
             mine_data = app.clipboard().mimeData()
             if mine_data.hasImage():
-                r = self.cur_record()
-                if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-                    self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+                r = self.get_cur_record_and_revert_save_if_needed()
                 px = QtGui.QPixmap(mine_data.imageData()).scaledToHeight(self.imageLabel.height(),
                                                                          mode=QtCore.Qt.TransformationMode.SmoothTransformation)
                 r.image = px
@@ -476,9 +465,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def image_double_clicked(self, event):
-        r = self.cur_record()
-        if r.status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
-            self.data.set_status(r.cid, RecordStatus.TOPROCESS)
+        r = self.get_cur_record_and_revert_save_if_needed()
         r.image = None
         self.imageLabel.setText("Click \nto paste \nimage")
 
@@ -537,7 +524,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def card_type_changed(self):
-        self.cur_record().cards = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
+        r = self.get_cur_record_and_revert_save_if_needed()
+        r.cards = "%s%s%s" % ("R" if self.checkR.isChecked() else "",
                                               "S" if self.checkS.isChecked() else "",
                                               "D" if self.checkD.isChecked() else "")
 
