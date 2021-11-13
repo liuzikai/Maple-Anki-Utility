@@ -78,13 +78,15 @@ class ThingsDB(DB):
     def fetch_all(self, new_only: bool) -> [dict]:
         records = []
         script = """
-            set ret to "" as text
+            set retList to {}
             tell application "Things3"
                 repeat with toDo in to dos of project "%s"
-                    set ret to ret & name of toDo & "$" & notes of toDo & "#"
+                    set end of retList to (name of toDo & "$" & notes of toDo)
                 end repeat
             end tell
-            return ret
+            set AppleScript's text item delimiters to "#"
+            set retString to retList as string
+            return retString
         """ % self.things_list
         p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate(script.encode())

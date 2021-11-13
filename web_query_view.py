@@ -152,9 +152,7 @@ class QueryWorker(QtWidgets.QWidget):
 
                 # Parse suggestion
                 suggestion = self._get_word_from_collins_url(sender.page().url().url())
-                subject = self._query.subject
-                # Space will be replace by '-' in url, but there are cases that subject itself contains '-'
-                if suggestion is not None and suggestion != subject.replace(' ', '-'):
+                if suggestion is not None:
                     self.collins_suggestion_retrieved.emit(self._query, suggestion)
 
                 # Retrieve freq and note

@@ -21,7 +21,11 @@ ANKI_MEDIA_PATH = "/Users/liuzikai/Library/Application Support/Anki2/liuzikai/co
 class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     """MapleVocabUtility MainWindow."""
 
-    MORE_CARDS_THRESHOLD = 4
+    BASIC_CARDS = "R"
+    MORE_CARDS_THRESHOLD_EN = 4
+    MORE_CARDS_EN = "RD"
+    MORE_CARDS_THRESHOLD_DE = 5
+    MORE_CARDS_DE = "RS"
 
     def __init__(self, parent=None):
 
@@ -35,7 +39,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.subject.textChanged.connect(self.subject_changed)
         self.subject.installEventFilter(self)  # response to Return key
         self.subjectSuggest.setVisible(False)
-        self.subjectSuggest.clicked.connect(self.suggest_clicked)
+        self.subjectSuggest.clicked.connect(self.subject_suggest_clicked)
+        self.cardTypeSuggest.clicked.connect(self.card_type_suggest_clicked)
         self.pronA.clicked.connect(self.pron_clicked)
         self.pronB.clicked.connect(self.pron_clicked)
         self.paraphrase.textChanged.connect(self.paraphrase_changed)
@@ -130,19 +135,27 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     def set_word_freq(self, cid: int, freq: int, freq_note: str):
         r = self.data.get(cid)
         r.freq = freq
-        if freq >= self.MORE_CARDS_THRESHOLD:
-            if self.englishMode.isChecked():
-                r.cards = "RD"
-            else:
-                r.cards = "RS"
-        else:
-            r.cards = "R"
         r.freq_note = freq_note
         if self.cur_cid() == cid:
             self.editor_load_entry(self.cur_cid())
 
     @QtCore.pyqtSlot(int, str)
     def handle_collins_suggestion(self, cid: int, suggestion: str):
+        subject = self.data.get(cid).subject
+        if self.deutschMode.isChecked():
+            subject = self.deutsch_mode_preprocess_subject(subject)
+
+        # Space will be replace by '-' in url, but there are cases that subject itself contains '-'
+        subject_with_dashes = subject.replace(' ', '-')
+        if suggestion == subject_with_dashes:
+            return
+
+        if self.deutschMode.isChecked():
+            if i := suggestion.find('_') != -1:
+                suggestion = suggestion[:i]
+            if suggestion.lower() == subject_with_dashes.lower():
+                return
+
         self.data.get(cid).suggestion = suggestion
         if self.cur_cid() == cid:
             self.editor_load_entry(self.cur_cid())
@@ -256,15 +269,30 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.editor_block_signals(True)  # -------- main editor signals blocked -------->
 
         self.subject.document().setPlainText(r.subject)
+
         if r.pronunciation == "Samantha" or r.pronunciation == "Anna":
             self.pronA.toggle()  # only change UI display but not triggering pronunciation
         elif r.pronunciation == "Daniel" or r.pronunciation == "Markus":
             self.pronB.toggle()  # only change UI display but not triggering pronunciation
+
         self.freqBar.setValue(r.freq)
         self.freqBar.setToolTip(r.freq_note)
         self.checkR.setChecked("R" in r.cards)
         self.checkS.setChecked("S" in r.cards)
         self.checkD.setChecked("D" in r.cards)
+
+        if self.englishMode.isChecked() and r.freq >= self.MORE_CARDS_THRESHOLD_EN:
+            suggested_cards = self.MORE_CARDS_EN
+        elif self.deutschMode.isChecked() and r.freq >= self.MORE_CARDS_THRESHOLD_DE:
+            suggested_cards = self.MORE_CARDS_DE
+        else:
+            suggested_cards = self.BASIC_CARDS
+        if r.cards != suggested_cards:
+            self.cardTypeSuggest.setText(suggested_cards + "?")
+            self.cardTypeSuggest.setVisible(True)
+        else:
+            self.cardTypeSuggest.setVisible(False)
+
         self.paraphrase.document().setHtml(r.paraphrase)
         self.extension.document().setHtml(r.extension)
         self.example.document().setHtml(r.example)
@@ -272,12 +300,14 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.source.setEnabled(r.source_enabled)
         self.source.document().setHtml(r.source)
         self.hint.document().setPlainText(r.hint)
+
         if r.image is not None:
             self.imageLabel.setPixmap(r.image)
         else:
             self.imageLabel.setText("Click to\npaste\nimage")
+
         if r.suggestion is not None:
-            self.subjectSuggest.setText("Suggest: " + r.suggestion)
+            self.subjectSuggest.setText(r.suggestion + "?")
             self.subjectSuggest.setVisible(True)
         else:
             self.subjectSuggest.setVisible(False)
@@ -289,7 +319,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         if self.entryList.currentRow() < self.entryList.count() - 1:
             self.entryList.selectionModel().blockSignals(True)  # --------- entryList signals blocked -------->
             self.entryList.setCurrentRow(self.entryList.currentRow() + 1)
-            self.selected_changed(query_immediately=False)  # delay query
+            self.selected_changed(manually_requested_query=False, query_immediately=False)  # delay query
             self.entryList.selectionModel().blockSignals(False)  # <-------- entryList signals unblocked --------
         else:
             self.add_new_entry_clicked()
@@ -310,7 +340,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
             if key == QtCore.Qt.Key.Key_Return or key == QtCore.Qt.Key.Key_Enter:
                 if (widget is self.subject) or (widget is self.paraphrase and self.paraphrase.toPlainText() == ""):
                     self.data.set_status(self.cur_cid(), RecordStatus.UNVIEWED)
-                    self.selected_changed(query_immediately=True)
+                    self.selected_changed(manually_requested_query=True, query_immediately=True)
                     return True  # discard the return key
             elif key == QtCore.Qt.Key.Key_B and event.modifiers() == QtCore.Qt.KeyboardModifier.ControlModifier:  # Ctrl + B
                 if widget in [self.paraphrase, self.extension, self.example, self.source]:
@@ -376,17 +406,18 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.move_to_next()
 
     @QtCore.pyqtSlot()
-    def selected_changed(self, query_immediately: bool = True):
+    def selected_changed(self, manually_requested_query: bool = False, query_immediately: bool = True):
         self.editor_load_entry(self.cur_cid())
         r = self.cur_record()
         if r.subject != "":
             if r.status == RecordStatus.UNVIEWED:
                 self.pronA.click()  # including toggling and first-time pronouncing
                 self.data.set_status(self.cur_cid(), RecordStatus.TOPROCESS)
-            if query_immediately or self.wqv.has_prefetched(r.subject, QueryType.COLLINS, r.cid):
-                self.wqv.request(r.subject, QueryType.COLLINS, r.cid)
-            else:
-                self.wqv.delay_request(r.subject, QueryType.COLLINS, r.cid)
+            if manually_requested_query or self.autoQueryCheck.isChecked():
+                if query_immediately or self.wqv.has_prefetched(r.subject, QueryType.COLLINS, r.cid):
+                    self.wqv.request(r.subject, QueryType.COLLINS, r.cid)
+                elif self.autoQueryCheck.isChecked():
+                    self.wqv.delay_request(r.subject, QueryType.COLLINS, r.cid)
 
     def get_cur_record_and_revert_save_if_needed(self):
         r = self.cur_record()
@@ -412,7 +443,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         # Do not query automatically. Wait for Return key.
 
     @QtCore.pyqtSlot()
-    def suggest_clicked(self):
+    def subject_suggest_clicked(self):
         r = self.get_cur_record_and_revert_save_if_needed()
 
         suggestion = r.suggestion
@@ -423,11 +454,17 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         # New GOOGLE_IMAGE query will be issued as paraphrase changes
 
     @QtCore.pyqtSlot()
+    def card_type_suggest_clicked(self):
+        r = self.get_cur_record_and_revert_save_if_needed()
+        r.cards = self.cardTypeSuggest.text()[:-1]
+        self.editor_load_entry(r.cid)
+
+    @QtCore.pyqtSlot()
     def paraphrase_changed(self):
         r = self.get_cur_record_and_revert_save_if_needed()
 
         r.paraphrase = self.paraphrase.toHtml()
-        if self.englishMode.isChecked():
+        if self.autoQueryCheck.isChecked() and self.englishMode.isChecked():
             # Trigger GOOGLE_IMAGE prefetch when paraphrase changes
             self.wqv.prefetch_immediately(r.subject, QueryType.GOOGLE_IMAGE, r.cid)
 

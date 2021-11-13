@@ -423,6 +423,13 @@ QProgressBar::chunk {
             </layout>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="cardTypeSuggest">
+            <property name="text">
+             <string>RD</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
@@ -774,6 +781,16 @@ p, li { white-space: pre-wrap; }
           <string>Web Query</string>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QCheckBox" name="autoQueryCheck">
+            <property name="text">
+             <string>Auto Query</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
           <item>
            <widget class="QLabel" name="queryStatusLabel">
             <property name="sizePolicy">
