@@ -345,7 +345,11 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @staticmethod
     def deutsch_mode_preprocess_subject(s: str) -> str:
-        s = s.replace('ä', 'a').replace('ü', 'u').replace('ö', 'o').replace('ß', "ss")
+        s = s.replace('ä', 'a').replace('Ä', 'A') \
+            .replace('ü', 'u').replace('Ü', 'U') \
+            .replace('ö', 'o').replace('Ö', 'O') \
+            .replace('ê', 'e').replace('Ê', 'E')\
+            .replace('ß', "ss")
         if s.startswith("der ") or s.startswith("die ") or s.startswith("das "):
             s = s[4:]
         return s
