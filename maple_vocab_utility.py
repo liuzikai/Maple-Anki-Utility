@@ -40,6 +40,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.subject.installEventFilter(self)  # response to Return key
         self.subjectSuggest.setVisible(False)
         self.subjectSuggest.clicked.connect(self.subject_suggest_clicked)
+        self.cardTypeSuggest.setVisible(False)
         self.cardTypeSuggest.clicked.connect(self.card_type_suggest_clicked)
         self.pronA.clicked.connect(self.pron_clicked)
         self.pronB.clicked.connect(self.pron_clicked)
