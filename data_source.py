@@ -115,17 +115,22 @@ class ThingsDB(DB):
         if self.word_categories[word_id] == category:
             return
 
+        if category == 100:
+            src = f'project "{self.things_list}"'
+            operation = "delete toDo"
+        else:
+            src = 'list "Trash"'
+            operation = f'move toDo to project "{self.things_list}"'
+
         # Move to-do immediately instead of waiting for commit_changes(), but in async way
-        from_list = self.things_list if category == 100 else "Trash"
-        to_list = "Trash" if category == 100 else self.things_list
         script = """
                             tell application "Things3"
-                                tell project "%s"
+                                tell %s
                                     set toDo to to do named "%s"
                                 end tell
-                                move toDo to list "%s"
+                                %s
                             end tell
-                        """ % (from_list, word_id, to_list)
+                        """ % (src, word_id, operation)
         p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE)
         p.stdin.write(script.encode())
         p.stdin.close()
