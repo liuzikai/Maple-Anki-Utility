@@ -234,6 +234,12 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     def handle_record_status_changed(self, cid: int, old_status: RecordStatus, new_status: RecordStatus):
         f = self.entryList.font()
         if new_status == RecordStatus.CONFIRMED:
+            r = self.data.get(cid)
+            if r.pronunciation == "Unknown":
+                if self.englishMode.isChecked():
+                    r.pronunciation = "Samantha"
+                elif self.deutschMode.isChecked():
+                    r.pronunciation = "Anna"
             f.setItalic(True)
             f.setStrikeOut(False)
             self.wqv.discard_by_cid(cid)
