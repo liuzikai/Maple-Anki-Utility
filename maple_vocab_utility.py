@@ -379,6 +379,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         QuerySettings["TranslateFrom"] = "en"
         QuerySettings["TranslateTo"] = "zh-CN"
         QuerySettings["PreprocessSubject"] = None
+        self.data.clear()
 
     @staticmethod
     def deutsch_mode_preprocess_subject(s: str) -> str:
@@ -401,6 +402,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         QuerySettings["TranslateFrom"] = "de"
         QuerySettings["TranslateTo"] = "en"
         QuerySettings["PreprocessSubject"] = self.deutsch_mode_preprocess_subject
+        self.data.clear()
 
     @QtCore.pyqtSlot()
     def confirm_clicked(self):
