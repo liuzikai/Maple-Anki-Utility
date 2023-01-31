@@ -20,7 +20,7 @@ def clean_html(h: str) -> str:
             span = PyQuery(span_elem)
             span_style = span.attr("style")
             span_inner = span.html()
-            if span_style.find("font-weight:600") != -1:
+            if span_style.find("font-weight:") != -1:
                 span_inner = "<b>" + span_inner + "</b>"
             if span_style.find("font-style:italic;") != -1:
                 span_inner = "<i>" + span_inner + "</i>"
