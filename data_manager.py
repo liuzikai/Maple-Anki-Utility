@@ -92,6 +92,12 @@ class DataManager(QtCore.QObject):
         self.record_cleared.emit()
         self.record_count_changed.emit()
 
+        # Clear self._exporter to save records to a new file next time
+        if self._exporter is not None:
+            self._exporter.close_file()
+            del self._exporter
+            self._exporter = None
+
     def reload_kindle_data(self, db_file: str) -> bool:
         """
         Clear _records and load _records from Kindle.
