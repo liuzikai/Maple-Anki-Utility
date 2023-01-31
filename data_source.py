@@ -81,10 +81,10 @@ class ThingsDB(DB):
             set retList to {}
             tell application "Things3"
                 repeat with toDo in to dos of project "%s"
-                    set end of retList to (name of toDo & "$" & notes of toDo)
+                    set end of retList to (name of toDo & "😅" & notes of toDo)
                 end repeat
             end tell
-            set AppleScript's text item delimiters to "#"
+            set AppleScript's text item delimiters to "🥲"
             set retString to retList as string
             return retString
         """ % self.things_list
@@ -94,11 +94,11 @@ class ThingsDB(DB):
             print("Failed to run applescript to fetch word list")
             print(err.decode("utf-8"))
 
-        for entry in out.decode("utf-8").split("#"):
+        for entry in out.decode("utf-8").split("🥲"):
             entry = entry.strip()
             if len(entry) == 0:
                 continue
-            p = entry.split("$")
+            p = entry.split("😅")
             assert len(p) == 2, "Invalid applescript output entry"
             records.append({
                 "word_id": p[0],  # using word as word_id
