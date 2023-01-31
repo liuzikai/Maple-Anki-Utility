@@ -32,8 +32,8 @@ class DataExporter:
     @staticmethod
     def new_random_filename(extension: str) -> str:
         """
-        Returns a path using the given extension that may be used for
-        writing out a temporary file.
+        Returns a filename with the given extension that may be used for writing out a temporary file.
+        The name consist of int(time() * 1E9) (ns) so it's impossible to collide given a low calling frequency.
         """
 
         from string import ascii_lowercase, digits
@@ -42,8 +42,8 @@ class DataExporter:
         from random import choice
         from time import time
         return '%x-%s.%s' % (
-            int(time()),
-            ''.join(choice(alphanumerics) for _ in range(30)),
+            int(time() * 1E9),
+            ''.join(choice(alphanumerics) for _ in range(21)),
             extension
         )
 
