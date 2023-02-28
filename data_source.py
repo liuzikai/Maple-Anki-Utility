@@ -116,21 +116,22 @@ class ThingsDB(DB):
             return
 
         if category == 100:
-            src = f'project "{self.things_list}"'
-            operation = "delete toDo"
+            script = f"""
+                tell application "Things3"
+                    set proj to project "{self.things_list}"
+                    set toDo to to do named "{word_id}" of proj
+                    delete toDo
+                end tell
+            """
         else:
-            src = 'list "Trash"'
-            operation = f'move toDo to project "{self.things_list}"'
+            script = f"""
+                tell application "Things3"
+                    set toDo to to do named "{word_id}" of list "Trash"
+                    set project of toDo to project "{self.things_list}"
+                end tell
+            """
 
         # Move to-do immediately instead of waiting for commit_changes(), but in async way
-        script = """
-                            tell application "Things3"
-                                tell %s
-                                    set toDo to to do named "%s"
-                                end tell
-                                %s
-                            end tell
-                        """ % (src, word_id, operation)
         p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE)
         p.stdin.write(script.encode())
         p.stdin.close()
