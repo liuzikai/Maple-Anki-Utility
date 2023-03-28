@@ -2,3 +2,6 @@
 	path = QWebKitView
 	url = git@github.com:liuzikai/pyqt-macos-native-webview.git
 	branch = main
+[submodule "Maple-Anki-Template"]
+	path = Maple-Anki-Template
+	url = https://github.com/liuzikai/Maple-Anki-Template.git
