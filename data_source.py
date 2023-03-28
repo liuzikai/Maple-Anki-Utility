@@ -24,8 +24,9 @@ class DB(ABC):
         - "subject" -> str
         - "usage" -> str
         - "source" -> str
+        Can throw RuntimeError.
         :param new_only: Only fetch new entries
-        :return: The list of entries in the data base
+        :return: The list of entries in the database
         """
         pass
 
@@ -33,6 +34,7 @@ class DB(ABC):
     def set_word_mature(self, word_id: str, category: int) -> None:
         """
         Set an entry as new/learned. The change may be cached and not taking effect until calling commit_changes()
+        Can throw RuntimeError.
         :param word_id: ID from fetch_all()
         :param category: 0 for new, 100 for learned
         :return: None
@@ -43,6 +45,7 @@ class DB(ABC):
     def commit_changes(self) -> None:
         """
         Commit changes of setting of word mature.
+        Can throw RuntimeError.
         :return: None
         """
         pass
@@ -91,8 +94,9 @@ class ThingsDB(DB):
         p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate(script.encode())
         if p.returncode != 0:
-            print("Failed to run applescript to fetch word list")
-            print(err.decode("utf-8"))
+            raise RuntimeError(f"Failed to run applescript to fetch word list.\n"
+                               f"Please make sure Things 3 is installed and the list is configured properly.\n\n"
+                               f"{err.decode('utf-8')}")
 
         for entry in out.decode("utf-8").split("🥲"):
             entry = entry.strip()
@@ -162,8 +166,8 @@ class CsvDB(DB):
         with open(self.db_file, "r", encoding="utf-8") as file:
             self.csv_first_line = file.readline()
             if len(self.csv_first_line.split(",")) < 5:
-                raise Exception("CSV file column number incorrect. At least 5 columns are required "
-                                "([subject, usage, title, authors, category], while the content can be empty.)")
+                raise RuntimeError("CSV file column number incorrect. At least 5 columns are required "
+                                   "([subject, usage, title, authors, category], while the content can be empty.)")
             # Discard the first line
             for line in file:
                 self.csv_data.append(line.split(","))

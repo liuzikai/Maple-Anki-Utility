@@ -98,13 +98,14 @@ class DataManager(QtCore.QObject):
             del self._exporter
             self._exporter = None
 
-    def reload_kindle_data(self, db_file: str) -> bool:
+    def reload_kindle_data(self, db_file: str) -> None:
         """
         Clear _records and load _records from Kindle.
+        Can throw RuntimeError.
         :return: True if file exists, False otherwise
         """
         if not os.path.isfile(db_file):
-            return False
+            raise RuntimeError("Failed to find Kindle DB file. Please make sure Kindle has connected.")
 
         # Set up database to KindleDB
         if self._db is not None:
@@ -114,15 +115,14 @@ class DataManager(QtCore.QObject):
 
         self._reload_from_db()
 
-        return True
-
-    def reload_csv_data(self, csv_file: str) -> bool:
+    def reload_csv_data(self, csv_file: str) -> None:
         """
         Clear _records and load _records from CSV file.
+        Can throw RuntimeError.
         :return: True if file exists, False otherwise
         """
         if not os.path.isfile(csv_file):
-            return False
+            raise RuntimeError("Failed to load CSV file.")
 
         # Setup database to CSV DB
         if self._db is not None:
@@ -132,11 +132,10 @@ class DataManager(QtCore.QObject):
 
         self._reload_from_db()
 
-        return True
-
     def reload_things_list(self, things_list: str) -> None:
         """
         Clear _records and load _records from given Things list.
+        Can throw RuntimeError.
         :return: None
         """
         # Setup database to Things DB
@@ -153,7 +152,11 @@ class DataManager(QtCore.QObject):
 
         self.batch_load_started.emit()
 
-        raw_record = self._db.fetch_all(new_only=True)
+        try:
+            raw_record = self._db.fetch_all(new_only=True)
+        except RuntimeError as e:
+            raise e
+
         for raw in raw_record:
             r = Record(
                 cid=len(self._records),  # use new index in self._records as cid

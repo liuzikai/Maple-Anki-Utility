@@ -9,13 +9,11 @@ from PyQt6 import QtCore, QtWidgets, QtGui
 from data_manager import DataManager, Record, RecordStatus
 from maple_utility import Ui_MapleUtility
 from web_query_view import WebQueryView, QueryType, QuerySettings
+import config
+import webbrowser
 
-# KINDLE_DB_FILENAME = "/Users/liuzikai/Documents/Programming/MapleVocabUtility/resource/test_vocab.db"
+# KINDLE_DB_FILENAME = "resource/test_vocab.db"
 KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab.db"
-CSV_DEFAULT_DIRECTORY = "/Users/liuzikai/Documents/Archive/GRE"
-THINGS_VOCAB_LIST = "English Quick List"
-SAVE_PATH = "/Users/liuzikai/Desktop"
-ANKI_MEDIA_PATH = "/Users/liuzikai/Library/Application Support/Anki2/liuzikai/collection.media"
 
 
 class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
@@ -91,6 +89,23 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
                                   self.source, self.hint, self.checkR, self.checkS, self.checkD,
                                   self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
 
+        # Create the menu bar
+        menu_bar = self.menuBar()
+        settings_menu = menu_bar.addMenu("Settings")
+
+        # Add "Settings..." item to the menu
+        settings_action = QtGui.QAction("Settings...", self)
+        settings_action.triggered.connect(self.show_settings_dialog)
+        settings_menu.addAction(settings_action)
+
+        # Create the Help menu
+        help_menu = menu_bar.addMenu("Help")
+
+        # Add "Visit Website" item to the Help menu
+        help_action = QtGui.QAction("Visit GitHub Page...", self)
+        help_action.triggered.connect(lambda: webbrowser.open('https://github.com/liuzikai/Maple-Anki-Utility'))
+        help_menu.addAction(help_action)
+
         # Setup WebQueryView
         self.wqv = WebQueryView(self.webViewFrame)
         self.wqv.setMinimumSize(QtCore.QSize(600, 0))
@@ -104,7 +119,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.wqv.report_worker_usage()  # update query usage label
 
         # Setup DataManager and connections
-        self.data = DataManager(SAVE_PATH, ANKI_MEDIA_PATH)
+        self.data = DataManager(config.save_dir, os.path.join(config.anki_user_dir, "collection.media"))
         self.data.record_inserted.connect(self.handle_record_insertion)  # cid, batch_loading(True) / add_single(False)
         self.data.record_status_changed.connect(self.handle_record_status_changed)  # cid, old_status, new_status
         self.data.record_cleared.connect(self.handle_record_clear)
@@ -341,6 +356,11 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     # ================================ UI Slots and Event Handler ================================
 
+    def show_settings_dialog(self):
+        # Create and show the ConfigWindow
+        config_window = config.ConfigWindow(self)
+        config_window.show()
+
     def eventFilter(self, widget, event):
         if event.type() == QtCore.QEvent.Type.KeyPress:
             key = event.key()
@@ -371,8 +391,6 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def change_to_english_mode(self):
-        global THINGS_VOCAB_LIST
-        THINGS_VOCAB_LIST = "English Quick List"
         self.pronA.setText("Samantha")
         self.pronB.setText("Daniel")
         QuerySettings["CollinsDirectory"] = "english"
@@ -386,7 +404,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         s = s.replace('ä', 'a').replace('Ä', 'A') \
             .replace('ü', 'u').replace('Ü', 'U') \
             .replace('ö', 'o').replace('Ö', 'O') \
-            .replace('ê', 'e').replace('Ê', 'E')\
+            .replace('ê', 'e').replace('Ê', 'E') \
             .replace('ß', "ss")
         if s.startswith("der ") or s.startswith("die ") or s.startswith("das "):
             s = s[4:]
@@ -394,8 +412,6 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def change_to_deutsch_mode(self):
-        global THINGS_VOCAB_LIST
-        THINGS_VOCAB_LIST = "Deutsch schnell Liste"
         self.pronA.setText("Anna")
         self.pronB.setText("Markus")
         QuerySettings["CollinsDirectory"] = "german-english"
@@ -525,8 +541,10 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def load_kindle_clicked(self) -> None:
-        if not self.data.reload_kindle_data(KINDLE_DB_FILENAME):
-            self.report_error("Failed to find Kindle DB file. Please make sure Kindle has connected.")
+        try:
+            self.data.reload_kindle_data(KINDLE_DB_FILENAME)
+        except RuntimeError as e:
+            self.report_error(str(e))
 
     @QtCore.pyqtSlot()
     def load_csv_clicked(self) -> None:
@@ -534,24 +552,30 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         # options |= QtWidgets.QFileDialog.Options.DontUseNativeDialog
         csv_file, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                             "Select the CSV file",
-                                                            CSV_DEFAULT_DIRECTORY,
+                                                            config.csv_default_dir,
                                                             "CSV Files (*.csv);;All Files (*)")
         if csv_file:
-            if not self.data.reload_csv_data(csv_file):
-                self.report_error("Failed to load CSV file.")
+            try:
+                self.data.reload_csv_data(csv_file)
+            except RuntimeError as e:
+                self.report_error(str(e))
 
     @QtCore.pyqtSlot()
     def load_things_clicked(self) -> None:
-        self.data.reload_things_list(THINGS_VOCAB_LIST)
+        things_list = config.things_vocab_list_en if self.englishMode.isChecked() else config.things_vocab_list_de
+        try:
+            self.data.reload_things_list(things_list)
+        except RuntimeError as e:
+            self.report_error(str(e))
 
     @staticmethod
     def report_error(info: str) -> None:
         msg_box = QtWidgets.QMessageBox()
         msg_box.setWindowTitle("Error")
         msg_box.setText(info)
-        msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-        msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
-        msg_box.exec_()
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     @QtCore.pyqtSlot()
     def confirm_and_smart_duplicate_entry(self):
@@ -605,7 +629,8 @@ if __name__ == '__main__':
     script_dir = os.path.dirname(os.path.realpath(__file__))
     app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
 
-    mapleUtility = MapleUtility()
-    mapleUtility.showMaximized()
+    if config.load_config(app):
+        mapleUtility = MapleUtility()
+        mapleUtility.showMaximized()
 
-    sys.exit(app.exec())
+        sys.exit(app.exec())
