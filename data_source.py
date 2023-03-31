@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import subprocess
 from abc import ABC, abstractmethod
+import appdirs
 
 
 class DB(ABC):
@@ -13,7 +14,7 @@ class DB(ABC):
     Abstract base class for MapleVocabUtility data source.
     """
 
-    DATA_DICT = "data/"
+    DATA_DICT = appdirs.user_config_dir("MapleVocabUtility")
     BACKUP_SUBDICT = "backup/"
 
     @abstractmethod
@@ -59,13 +60,12 @@ class DB(ABC):
         :return:
         """
 
-        if not os.path.exists(DB.DATA_DICT + DB.BACKUP_SUBDICT):
-            os.makedirs(DB.DATA_DICT + DB.BACKUP_SUBDICT)
+        os.makedirs(os.path.join(DB.DATA_DICT, DB.BACKUP_SUBDICT), exist_ok=True)
 
         backup_name = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
         if suffix != "":
             backup_name += "_" + suffix
-        backup_full_name = DB.DATA_DICT + DB.BACKUP_SUBDICT + backup_name
+        backup_full_name = os.path.join(DB.DATA_DICT, DB.BACKUP_SUBDICT, backup_name)
 
         subprocess.Popen(['bash', '-c',
                           'cp "%s" "%s" && tar -czf "%s.tar.gz" "%s" && rm "%s"' %
