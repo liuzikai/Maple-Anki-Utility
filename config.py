@@ -175,7 +175,7 @@ class ConfigWindow(QtWidgets.QDialog):
             }
         """)
         self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
+            QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#add-voices")))
 
         help_layout.addWidget(self.help_label)
         help_layout.addWidget(self.help_button)
@@ -231,6 +231,16 @@ class ConfigWindow(QtWidgets.QDialog):
 
     def populate_voice_comboboxes(self):
         try:
+            subprocess.check_output("lame --version", shell=True, text=True)
+        except subprocess.CalledProcessError:
+            self.help_label.setText("Please install lame (for example, with Homebrew, run 'brew install lame'), "
+                                    "or the pronunciation functionality will not work.")
+            self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
+                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
+            self.disable_voice_settings()
+            return
+
+        try:
             voices_output = subprocess.check_output("say -v '?'", shell=True, text=True)
             lines = voices_output.split("\n")
             for line in lines:
@@ -256,11 +266,14 @@ class ConfigWindow(QtWidgets.QDialog):
         except subprocess.CalledProcessError:
             self.help_label.setText("Failed to run 'say -v \"?\"'. Pronunciation functionality will not work.")
             self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
-                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#add-voices")))
-            for dropdown in self.voice_dropdowns:
-                dropdown.setEnabled(False)
-            for test_button in self.voice_test_buttons:
-                test_button.setEnabled(False)
+                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
+            self.disable_voice_settings()
+
+    def disable_voice_settings(self):
+        for dropdown in self.voice_dropdowns:
+            dropdown.setEnabled(False)
+        for test_button in self.voice_test_buttons:
+            test_button.setEnabled(False)
 
     def connect_test_buttons(self):
         for i, test_button in enumerate(self.voice_test_buttons):
