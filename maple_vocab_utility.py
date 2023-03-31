@@ -252,9 +252,9 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
             r = self.data.get(cid)
             if r.pronunciation == "Unknown":
                 if self.englishMode.isChecked():
-                    r.pronunciation = "Samantha"
+                    r.pronunciation = config.en_voice_1
                 elif self.deutschMode.isChecked():
-                    r.pronunciation = "Anna"
+                    r.pronunciation = config.de_voice_1
             f.setItalic(True)
             f.setStrikeOut(False)
             self.wqv.discard_by_cid(cid)
@@ -292,9 +292,9 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
         self.subject.document().setPlainText(r.subject)
 
-        if r.pronunciation == "Samantha" or r.pronunciation == "Anna":
+        if r.pronunciation == config.en_voice_1 or r.pronunciation == config.de_voice_1:
             self.pronA.toggle()  # only change UI display but not triggering pronunciation
-        elif r.pronunciation == "Daniel" or r.pronunciation == "Markus":
+        elif r.pronunciation == config.en_voice_2 or r.pronunciation == config.de_voice_2:
             self.pronB.toggle()  # only change UI display but not triggering pronunciation
 
         self.freqBar.setValue(r.freq)
@@ -359,6 +359,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     def show_settings_dialog(self):
         # Create and show the ConfigWindow
         config_window = config.ConfigWindow(self)
+        config_window.finished.connect(self.set_pronunciation_captions)
         config_window.show()
 
     def eventFilter(self, widget, event):
@@ -390,9 +391,16 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         return QtWidgets.QWidget.eventFilter(self, widget, event)
 
     @QtCore.pyqtSlot()
+    def set_pronunciation_captions(self):
+        if self.englishMode.isChecked():
+            self.pronA.setText(config.en_voice_1)
+            self.pronB.setText(config.en_voice_2)
+        elif self.deutschMode.isChecked():
+            self.pronA.setText(config.de_voice_1)
+            self.pronB.setText(config.de_voice_2)
+    @QtCore.pyqtSlot()
     def change_to_english_mode(self):
-        self.pronA.setText("Samantha")
-        self.pronB.setText("Daniel")
+        self.set_pronunciation_captions()
         QuerySettings["CollinsDirectory"] = "english"
         QuerySettings["TranslateFrom"] = "en"
         QuerySettings["TranslateTo"] = "zh-CN"
@@ -412,8 +420,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
     @QtCore.pyqtSlot()
     def change_to_deutsch_mode(self):
-        self.pronA.setText("Anna")
-        self.pronB.setText("Markus")
+        self.set_pronunciation_captions()
         QuerySettings["CollinsDirectory"] = "german-english"
         QuerySettings["TranslateFrom"] = "de"
         QuerySettings["TranslateTo"] = "en"

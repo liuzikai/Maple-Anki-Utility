@@ -3,12 +3,18 @@ import os
 import configparser
 import appdirs
 from PyQt6 import QtCore, QtWidgets, QtGui
+import subprocess
+from functools import partial
 
 anki_user_dir = None
 save_dir = None
 csv_default_dir = ""
 things_vocab_list_en = None
 things_vocab_list_de = None
+en_voice_1 = None
+en_voice_2 = None
+de_voice_1 = None
+de_voice_2 = None
 
 # ConfigParser setup
 config_dir = appdirs.user_config_dir("MapleVocabUtility")
@@ -23,6 +29,10 @@ def save_config_from_variables():
     parser.set('DEFAULT', 'csv_default_dir', csv_default_dir)
     parser.set('DEFAULT', 'things_vocab_list_en', things_vocab_list_en)
     parser.set('DEFAULT', 'things_vocab_list_de', things_vocab_list_de)
+    parser.set('DEFAULT', 'en_voice_1', en_voice_1)
+    parser.set('DEFAULT', 'en_voice_2', en_voice_2)
+    parser.set('DEFAULT', 'de_voice_1', de_voice_1)
+    parser.set('DEFAULT', 'de_voice_2', de_voice_2)
     os.makedirs(config_dir, exist_ok=True)
     with open(config_file, 'w') as f:
         parser.write(f)
@@ -39,6 +49,7 @@ def is_config_valid() -> bool:
 
 def load_config(app) -> bool:
     global anki_user_dir, save_dir, csv_default_dir, things_vocab_list_en, things_vocab_list_de
+    global en_voice_1, en_voice_2, de_voice_1, de_voice_2
 
     config_exists = os.path.exists(config_file)
 
@@ -49,6 +60,10 @@ def load_config(app) -> bool:
     csv_default_dir = parser.get('DEFAULT', 'csv_default_dir', fallback="")
     things_vocab_list_en = parser.get('DEFAULT', 'things_vocab_list_en', fallback="English Quick List")
     things_vocab_list_de = parser.get('DEFAULT', 'things_vocab_list_de', fallback="Deutsch schnell Liste")
+    en_voice_1 = parser.get('DEFAULT', 'en_voice_1', fallback="Samantha")
+    en_voice_2 = parser.get('DEFAULT', 'en_voice_2', fallback="Daniel")
+    de_voice_1 = parser.get('DEFAULT', 'de_voice_1', fallback="Anna")
+    de_voice_2 = parser.get('DEFAULT', 'de_voice_2', fallback="Markus")
 
     if not config_exists or not is_config_valid():
         if anki_user_dir is None or not os.path.exists(anki_user_dir):
@@ -60,7 +75,7 @@ def load_config(app) -> bool:
     return is_config_valid()  # user may cancel
 
 
-class ConfigWindow(QtWidgets.QWidget):
+class ConfigWindow(QtWidgets.QDialog):
     def __init__(self, app, initial_setup=False):
         super().__init__()
         self.app = app
@@ -73,7 +88,7 @@ class ConfigWindow(QtWidgets.QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Configuration')
+        self.setWindowTitle('Preferences')
 
         self.setMinimumWidth(800)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowMinMaxButtonsHint)
@@ -135,21 +150,130 @@ class ConfigWindow(QtWidgets.QWidget):
         layout.addWidget(things3_list_de_edit, 4, 1)
         self.line_edits['things3_list_de'] = things3_list_de_edit
 
+        # Vertical spacer
+        spacer = QtWidgets.QSpacerItem(0, 16, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        layout.addItem(spacer, 6, 0, 1, 3)
+
+        # Voice Setting GroupBox
+        voice_setting_group = QtWidgets.QGroupBox("Voice Settings")
+        voice_setting_layout = QtWidgets.QGridLayout()
+
+        # Create a QHBoxLayout for help_label and help_button
+        help_layout = QtWidgets.QHBoxLayout()
+
+        self.help_label = QtWidgets.QLabel("Install more voices in macOS System Settings")
+        self.help_button = QtWidgets.QPushButton("?")
+        self.help_button.setFixedSize(30, 30)
+        self.help_button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                color: blue;
+                text-decoration: underline;
+            }
+            QPushButton:hover {
+                color: darkblue;
+            }
+        """)
+        self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
+            QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
+
+        help_layout.addWidget(self.help_label)
+        help_layout.addWidget(self.help_button)
+
+        # Add a spacer to expand the layout
+        help_layout.addStretch()
+
+        # Add the help_layout to the voice_setting_layout
+        voice_setting_layout.addLayout(help_layout, 0, 0, 1, 8)
+
+        self.voice_labels = ["EN Voice 1", "EN Voice 2", "DE Voice 1", "DE Voice 2"]
+        self.voice_dropdowns = []
+        self.voice_test_buttons = []
+
+        for i, label_text in enumerate(self.voice_labels):
+            label = QtWidgets.QLabel(label_text)
+            dropdown = QtWidgets.QComboBox()
+            self.voice_dropdowns.append(dropdown)
+            test_button = QtWidgets.QPushButton("Test")
+            self.voice_test_buttons.append(test_button)
+
+            row, col = divmod(i, 2)
+            voice_setting_layout.addWidget(label, row + 1, col * 4)
+            voice_setting_layout.addWidget(dropdown, row + 1, col * 4 + 1)
+            voice_setting_layout.addWidget(test_button, row + 1, col * 4 + 2)
+
+            if col == 0:
+                spacer = QtWidgets.QSpacerItem(30, 0, QtWidgets.QSizePolicy.Policy.Fixed,
+                                               QtWidgets.QSizePolicy.Policy.Fixed)
+                voice_setting_layout.addItem(spacer, row + 1, 3)
+
+        self.populate_voice_comboboxes()
+        self.connect_test_buttons()
+
+        voice_setting_group.setLayout(voice_setting_layout)
+        layout.addWidget(voice_setting_group, 7, 0, 1, 3)
+
         # Create Save and Cancel buttons
         self.save_button = QtWidgets.QPushButton('Save')
         self.cancel_button = QtWidgets.QPushButton('Cancel')
 
         self.save_button.clicked.connect(self.save)
-        self.cancel_button.clicked.connect(self.close)
+        self.cancel_button.clicked.connect(self.reject)
 
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addStretch(1)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.cancel_button)
 
-        layout.addLayout(button_layout, 5, 1, 1, 2)
+        layout.addLayout(button_layout, 8, 1, 1, 2)
 
         self.load_defaults()
+
+    def populate_voice_comboboxes(self):
+        try:
+            voices_output = subprocess.check_output("say -v '?'", shell=True, text=True)
+            lines = voices_output.split("\n")
+            for line in lines:
+                if not line:
+                    continue
+                voice_language, sample = line.split("# ", 1)
+                voice_language = voice_language.rstrip()
+
+                if any(lang in voice_language for lang in ["en_US", "en_GB", "de_DE"]):
+                    voice, language = voice_language.rsplit(" ", 1)
+                    voice = voice.rstrip()
+
+                    if language in ["en_US", "en_GB"]:
+                        for i in [0, 1]:
+                            item = f"{voice} [{language}]"
+                            self.voice_dropdowns[i].addItem(item, userData={"voice": voice, "sample": sample})
+                    elif language == "de_DE":
+                        for i in [2, 3]:
+                            item = f"{voice} [{language}]"
+                            self.voice_dropdowns[i].addItem(item, userData={"voice": voice, "sample": sample})
+                else:
+                    continue
+        except subprocess.CalledProcessError:
+            self.help_label.setText("Failed to run 'say -v \"?\"'. Pronunciation functionality will not work.")
+            self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
+                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#add-voices")))
+            for dropdown in self.voice_dropdowns:
+                dropdown.setEnabled(False)
+            for test_button in self.voice_test_buttons:
+                test_button.setEnabled(False)
+
+    def connect_test_buttons(self):
+        for i, test_button in enumerate(self.voice_test_buttons):
+            test_button.clicked.connect(partial(self.test_voice, i))
+
+    def test_voice(self, index):
+        dropdown = self.voice_dropdowns[index]
+        voice_data = dropdown.currentData()
+        if voice_data:
+            voice = voice_data["voice"]
+            sample = voice_data["sample"]
+            command = f'say -v "{voice}" "{sample}"'
+            subprocess.Popen(command, shell=True)
 
     def load_defaults(self):
         self.line_edits['anki_user_dir'].setText(anki_user_dir)
@@ -162,6 +286,15 @@ class ConfigWindow(QtWidgets.QWidget):
         self.check_save_dir()
         self.check_csv_default_dir()
 
+        voice_settings = [en_voice_1, en_voice_2, de_voice_1, de_voice_2]
+        for i, voice_setting in enumerate(voice_settings):
+            if voice_setting:
+                for j in range(self.voice_dropdowns[i].count()):
+                    item_data = self.voice_dropdowns[i].itemData(j)
+                    if item_data and item_data["voice"] == voice_setting:
+                        self.voice_dropdowns[i].setCurrentIndex(j)
+                        break
+
     def select_directory(self, option, caption, default_dir):
         selected_directory = QtWidgets.QFileDialog.getExistingDirectory(self, caption, default_dir)
         if selected_directory:
@@ -169,6 +302,7 @@ class ConfigWindow(QtWidgets.QWidget):
 
     def save(self):
         global anki_user_dir, save_dir, csv_default_dir, things_vocab_list_en, things_vocab_list_de
+        global en_voice_1, en_voice_2, de_voice_1, de_voice_2
 
         anki_user_dir = self.line_edits['anki_user_dir'].text()
         save_dir = self.line_edits['save_dir'].text()
@@ -176,9 +310,14 @@ class ConfigWindow(QtWidgets.QWidget):
         things_vocab_list_en = self.line_edits['things3_list_en'].text()
         things_vocab_list_de = self.line_edits['things3_list_de'].text()
 
+        en_voice_1 = self.voice_dropdowns[0].currentData()["voice"]
+        en_voice_2 = self.voice_dropdowns[1].currentData()["voice"]
+        de_voice_1 = self.voice_dropdowns[2].currentData()["voice"]
+        de_voice_2 = self.voice_dropdowns[3].currentData()["voice"]
+
         save_config_from_variables()
         self.initial_setup = False
-        self.close()
+        self.accept()
 
     def check_anki_user_dir(self):
         user_dir = self.line_edits['anki_user_dir'].text()
@@ -230,6 +369,7 @@ class ConfigWindow(QtWidgets.QWidget):
                 event.ignore()
         else:
             event.accept()
+
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
