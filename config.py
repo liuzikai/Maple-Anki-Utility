@@ -5,6 +5,7 @@ import appdirs
 from PyQt6 import QtCore, QtWidgets, QtGui
 import subprocess
 from functools import partial
+import bundle_files
 
 anki_user_dir = None
 save_dir = None
@@ -230,9 +231,10 @@ class ConfigWindow(QtWidgets.QDialog):
         self.load_defaults()
 
     def populate_voice_comboboxes(self):
-        try:
-            subprocess.check_output("lame --version", shell=True, text=True)
-        except subprocess.CalledProcessError:
+        p = subprocess.Popen(f'"{bundle_files.lame_filename}" --version', shell=True, text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.PIPE)
+        exit_code = p.wait()
+        if exit_code != 0:
             self.help_label.setText("Please install lame (for example, with Homebrew, run 'brew install lame'), "
                                     "or the pronunciation functionality will not work.")
             self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
@@ -240,34 +242,38 @@ class ConfigWindow(QtWidgets.QDialog):
             self.disable_voice_settings()
             return
 
-        try:
-            voices_output = subprocess.check_output("say -v '?'", shell=True, text=True)
-            lines = voices_output.split("\n")
-            for line in lines:
-                if not line:
-                    continue
-                voice_language, sample = line.split("# ", 1)
-                voice_language = voice_language.rstrip()
-
-                if any(lang in voice_language for lang in ["en_US", "en_GB", "de_DE"]):
-                    voice, language = voice_language.rsplit(" ", 1)
-                    voice = voice.rstrip()
-
-                    if language in ["en_US", "en_GB"]:
-                        for i in [0, 1]:
-                            item = f"{voice} [{language}]"
-                            self.voice_dropdowns[i].addItem(item, userData={"voice": voice, "sample": sample})
-                    elif language == "de_DE":
-                        for i in [2, 3]:
-                            item = f"{voice} [{language}]"
-                            self.voice_dropdowns[i].addItem(item, userData={"voice": voice, "sample": sample})
-                else:
-                    continue
-        except subprocess.CalledProcessError:
+        p = subprocess.Popen("say -v '?'", shell=True, text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.PIPE)
+        voices_output, _ = p.communicate()
+        exit_code = p.wait()
+        if exit_code != 0:
             self.help_label.setText("Failed to run 'say -v \"?\"'. Pronunciation functionality will not work.")
             self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
                 QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
             self.disable_voice_settings()
+            return
+
+        lines = voices_output.split("\n")
+        for line in lines:
+            if not line:
+                continue
+            voice_language, sample = line.split("# ", 1)
+            voice_language = voice_language.rstrip()
+
+            if any(lang in voice_language for lang in ["en_US", "en_GB", "de_DE"]):
+                voice, language = voice_language.rsplit(" ", 1)
+                voice = voice.rstrip()
+
+                if language in ["en_US", "en_GB"]:
+                    for i in [0, 1]:
+                        item = f"{voice} [{language}]"
+                        self.voice_dropdowns[i].addItem(item, userData={"voice": voice, "sample": sample})
+                elif language == "de_DE":
+                    for i in [2, 3]:
+                        item = f"{voice} [{language}]"
+                        self.voice_dropdowns[i].addItem(item, userData={"voice": voice, "sample": sample})
+            else:
+                continue
 
     def disable_voice_settings(self):
         for dropdown in self.voice_dropdowns:
@@ -286,7 +292,8 @@ class ConfigWindow(QtWidgets.QDialog):
             voice = voice_data["voice"]
             sample = voice_data["sample"]
             command = f'say -v "{voice}" "{sample}"'
-            subprocess.Popen(command, shell=True)
+            subprocess.Popen(command, shell=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def load_defaults(self):
         self.line_edits['anki_user_dir'].setText(anki_user_dir)

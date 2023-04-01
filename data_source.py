@@ -69,7 +69,8 @@ class DB(ABC):
 
         subprocess.Popen(['bash', '-c',
                           'cp "%s" "%s" && tar -czf "%s.tar.gz" "%s" && rm "%s"' %
-                          (file, backup_full_name, backup_full_name, backup_full_name, backup_full_name)])
+                          (file, backup_full_name, backup_full_name, backup_full_name, backup_full_name)],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 class ThingsDB(DB):
@@ -136,7 +137,7 @@ class ThingsDB(DB):
             """
 
         # Move to-do immediately instead of waiting for commit_changes(), but in async way
-        p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE)
+        p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         p.stdin.write(script.encode())
         p.stdin.close()
 

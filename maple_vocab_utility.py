@@ -633,8 +633,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
+    # script_dir = os.path.dirname(os.path.realpath(__file__))
+    # app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
 
     if config.load_config(app):
         mapleUtility = MapleUtility()
