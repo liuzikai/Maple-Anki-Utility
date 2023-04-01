@@ -5,3 +5,4 @@
 [submodule "Maple-Anki-Template"]
 	path = Maple-Anki-Template
 	url = https://github.com/liuzikai/Maple-Anki-Template.git
+	branch = main

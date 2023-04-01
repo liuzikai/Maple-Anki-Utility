@@ -176,7 +176,7 @@ class ConfigWindow(QtWidgets.QDialog):
             }
         """)
         self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#add-voices")))
+            QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility/blob/main/resource/user-manual.md#add-voices")))
 
         help_layout.addWidget(self.help_label)
         help_layout.addWidget(self.help_button)
@@ -238,7 +238,7 @@ class ConfigWindow(QtWidgets.QDialog):
             self.help_label.setText("Please install lame (for example, with Homebrew, run 'brew install lame'), "
                                     "or the pronunciation functionality will not work.")
             self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
-                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
+                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#getting-started")))
             self.disable_voice_settings()
             return
 
@@ -249,7 +249,7 @@ class ConfigWindow(QtWidgets.QDialog):
         if exit_code != 0:
             self.help_label.setText("Failed to run 'say -v \"?\"'. Pronunciation functionality will not work.")
             self.help_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(
-                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#pronunciation")))
+                QtCore.QUrl("https://github.com/liuzikai/Maple-Anki-Utility#getting-started")))
             self.disable_voice_settings()
             return
 

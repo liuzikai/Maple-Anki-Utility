@@ -57,15 +57,15 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.confirm_shortcut.activated.connect(self.confirm_clicked)
         self.confirm_and_smart_duplicate_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Return"), self)
         self.confirm_and_smart_duplicate_shortcut.activated.connect(self.confirm_and_smart_duplicate_entry)
-        self.confirmButton.setToolTip("Shortcut: Ctrl + Return\nConfirm and smart duplicate: Ctrl + Shift + Return")
+        self.confirmButton.setToolTip("Shortcut: Cmd + Return\nConfirm and smart duplicate: Cmd + Shift + Return")
         self.discard_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Alt+Return"), self)
         self.discard_shortcut.activated.connect(self.discard_clicked)
-        self.discardButton.setToolTip("Shortcut: Ctrl + Alt + Return")
+        self.discardButton.setToolTip("Shortcut: Cmd + Opt + Return")
         self.new_entry_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+N"), self)
         self.new_entry_shortcut.activated.connect(self.add_new_entry_clicked)
         self.smart_duplicate_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+N"), self)
         self.smart_duplicate_shortcut.activated.connect(self.smart_duplicate_entry)
-        self.newEntry.setToolTip("Shortcut: Ctrl + N\nSmart duplicate: Ctrl + Shift + N")
+        self.newEntry.setToolTip("Shortcut: Cmd + N\nSmart Duplicate: Cmd + Shift + N")
         # There is no mouse signal for label. Override functions.
         self.imageLabel.mousePressEvent = self.image_clicked
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
@@ -101,7 +101,12 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         # Create the Help menu
         help_menu = menu_bar.addMenu("Help")
 
-        # Add "Visit Website" item to the Help menu
+        # Add "User Manual" item to the Help menu
+        help_action = QtGui.QAction("User Manual...", self)
+        help_action.triggered.connect(lambda: webbrowser.open('https://github.com/liuzikai/Maple-Anki-Utility/blob/main/resource/user-manual.md'))
+        help_menu.addAction(help_action)
+
+        # Add "Visit GitHub Page" item to the Help menu
         help_action = QtGui.QAction("Visit GitHub Page...", self)
         help_action.triggered.connect(lambda: webbrowser.open('https://github.com/liuzikai/Maple-Anki-Utility'))
         help_menu.addAction(help_action)
