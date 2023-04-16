@@ -15,14 +15,20 @@ jobs:
       with:
         python-version: 3.9
     
-    - name: Install lame
+    - name: Install lame and create-dmg
       run: |
         brew update
-        brew install lame
+        brew install lame create-dmg
    
     - run: pip install -r requirements.txt pyinstaller
     - run: pyinstaller --windowed -noconsole --add-binary="$(which lame):." -n "Maple Vocab Utility" --icon resource/icon.icns maple_vocab_utility.py
+
+    - name: Create dmg
+      run: |
+        chmod +x /create_dmg.sh
+        ./create_dmg.sh
+      shell: bash
     
     - uses: actions/upload-artifact@v2
       with:
-        path: 'dist/Maple Vocab Utility.app'
+        path: 'Maple-Vocab-Utility-Installer.dmg'
