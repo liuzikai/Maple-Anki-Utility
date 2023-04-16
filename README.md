@@ -26,7 +26,7 @@ The main part of it is in PyQt6 and should be portable. Contributions are welcom
 
 Download the pre-built application in the release page.
 
-=> [User Manual](resource/user-manual.md)
+=> [User Manual](resource/user-manual.md). You may want to at least get familiar basic workflow of the tool.
 
 If you want to run the tool manually in Python, download the repo and run `pip3 install -r requirements.txt`.
 In addition, you will need the following tools:

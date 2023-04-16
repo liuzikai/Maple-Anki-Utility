@@ -53,15 +53,16 @@ The general workflow is:
 
 * Import the vocabulary from one of the data sources: Kindle Vocabulary Builder (`Kindle`), CSV file (`CSV`), Things 3
   list (`Things`), or create a single entry manually (`New`).
-* Choose a word on the left side to edit its card. All automations built in
-  the [Maple Anki Template](https://github.com/liuzikai/Maple-Anki-Template) work after importing to Anki.
+* Choose a word on the left side to edit its card. Or edit the subject, and **press Enter** to apply changes 
+  (trigger pronunciation and web query) All automations in
+  the [Maple Anki Template](https://github.com/liuzikai/Maple-Anki-Template) work after importing the cards to Anki.
   For example, `cn.` in the `Paraphrase` section will be highlighted as a part of speech (POS).
 * The word is automatically looked up on the Collins Directory on the right side (if `Auto Query` is checked).
   To search the word on a different website, use the buttons on the top right.
-* Click `Confirm` to save the card. Click `Discard` to discard a word.
+* Click `Confirm` (`Cmd + Enter`) to save the card(s). Click `Discard` (`Cmd + Opt + Enter`) to discard a word.
 * Close the program at any time. Confirmed cards are saved to a txt file in the save directory
-  you [configure](#initial-setup--preferences-)
-  Confirmed or Discarded words will not appear when you load the same data source next time. The other words remain.
+  you [configure](#initial-setup--preferences-).
+  Confirmed or Discarded words will not appear next time you load the same data source. The other words remain.
 * Import the generated txt file into Anki, following [these instructions](#import-to-anki).
 
 Hover over UI components to see Tips.
@@ -127,6 +128,7 @@ When a word is confirmed or discarded, the corresponding todo is moved to the Tr
 ## Create a Single Entry Manually
 
 As the name suggests, create a single entry manually by clicking `New` (`Cmd + N`).
+You can edit the subject and press Enter to trigger pronunciation and web query.
 This button is still available when a Kindle/CSV/Things data source is loaded, and the created entry is **not** written
 back to the source.
 Manually created entries **will** disappear on `Clear` or loading another data source.
@@ -156,7 +158,7 @@ Visit the link to see its usage and functionalities.
 
 The word to learn.
 
-In the textbox, press Enter to trigger [Collins Web Query](#collins-web-directory) on the current subject.
+In the textbox, press Enter to trigger pronunciation and [Collins Web Query](#collins-web-directory) on the current subject.
 
 To select the card types to generate, use the checkboxes on the right: `R` for Recite, `S` for Spelling, `D` for
 Dictation (three card types of the [Maple Anki Template](https://github.com/liuzikai/Maple-Anki-Template)).
