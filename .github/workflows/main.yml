@@ -25,7 +25,7 @@ jobs:
 
     - name: Create dmg
       run: |
-        chmod +x /create_dmg.sh
+        chmod +x ./create_dmg.sh
         ./create_dmg.sh
       shell: bash
     
