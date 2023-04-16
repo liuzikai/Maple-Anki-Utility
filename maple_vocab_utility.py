@@ -569,6 +569,10 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         if csv_file:
             try:
                 self.data.reload_csv_data(csv_file)
+                csv_dir = os.path.dirname(csv_file)
+                if csv_dir != config.csv_default_dir:
+                    config.csv_default_dir = csv_dir
+                    config.save_config_from_variables()
             except RuntimeError as e:
                 self.report_error(str(e))
 

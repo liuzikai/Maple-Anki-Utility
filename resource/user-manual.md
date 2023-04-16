@@ -2,40 +2,37 @@ Maple Anki Utility User Manual
 ==============================
 
 <!-- TOC -->
-
-* [Maple Anki Utility User Manual](#maple-anki-utility-user-manual)
 * [Overview](#overview)
 * [Initial Setup (Preferences)](#initial-setup--preferences-)
-    * [Add Voices](#add-voices)
+  * [Add Voices](#add-voices)
 * [Data Sources and Vocabulary List](#data-sources-and-vocabulary-list)
-    * [Kindle Vocabulary Builder](#kindle-vocabulary-builder)
-    * [CSV](#csv)
-    * [Things 3 List](#things-3-list)
-    * [Create a Single Entry Manually](#create-a-single-entry-manually)
-        * [Smart Duplication](#smart-duplication)
-    * [Navigate in the Vocabulary List](#navigate-in-the-vocabulary-list)
-    * [Learning Progress Indicators](#learning-progress-indicators)
+  * [Kindle Vocabulary Builder](#kindle-vocabulary-builder)
+  * [CSV](#csv)
+  * [Things 3 List](#things-3-list)
+  * [Create a Single Entry Manually](#create-a-single-entry-manually)
+    * [Smart Duplication](#smart-duplication)
+  * [Navigate in the Vocabulary List](#navigate-in-the-vocabulary-list)
+  * [Learning Progress Indicators](#learning-progress-indicators)
 * [Card Editor](#card-editor)
-    * [Subject and Card Type Selectors](#subject-and-card-type-selectors)
-    * [Pronunciation](#pronunciation)
-    * [Paraphrase](#paraphrase)
-        * [Add an Image](#add-an-image)
-    * [Extension](#extension)
-    * [Example](#example)
-    * [Hint](#hint)
-    * [Text Formatting](#text-formatting)
-    * [Confirm and Discard](#confirm-and-discard)
+  * [Subject and Card Type Selectors](#subject-and-card-type-selectors)
+  * [Pronunciation](#pronunciation)
+  * [Paraphrase](#paraphrase)
+    * [Add an Image](#add-an-image)
+  * [Extension](#extension)
+  * [Example](#example)
+  * [Hint](#hint)
+  * [Text Formatting](#text-formatting)
+  * [Confirm and Discard](#confirm-and-discard)
 * [Web Query](#web-query)
-    * [Collins Web Directory](#collins-web-directory)
-    * [Google](#google)
-    * [Google Images](#google-images)
-    * [Google Translate](#google-translate)
-    * [Navigate Forward and Back](#navigate-forward-and-back)
+  * [Collins Web Directory](#collins-web-directory)
+  * [Google](#google)
+  * [Google Images](#google-images)
+  * [Google Translate](#google-translate)
+  * [Navigate Forward and Back](#navigate-forward-and-back)
 * [Import to Anki](#import-to-anki)
 * [Miscellaneous](#miscellaneous)
-    * [Path of the Configuration File](#path-of-the-configuration-file)
-    * [Backup of Kindle and CSV Database](#backup-of-kindle-and-csv-database)
-
+  * [Path of the Configuration File](#path-of-the-configuration-file)
+  * [Backup of Kindle and CSV Database](#backup-of-kindle-and-csv-database)
 <!-- TOC -->
 
 # Overview
@@ -48,8 +45,7 @@ It generates a txt file that contains the cards to be batch imported to Anki.
 > Why not make it an Anki add-on? Currently, there is no plan for that, as the utility consists of many parts.
 > For example, it uses [QWebKitView](https://github.com/liuzikai/pyqt-macos-native-webview), wrapping macOS native
 > WKWebView in PyQt. Building it as an Anki add-on may not bring many benefits but can introduce a lot of difficulties
-> to
-> test and debug.
+> to test and debug.
 
 ![Annotated](utility-annotated.png)
 
@@ -80,8 +76,6 @@ in the menu bar.
 * Anki User Directory: select your user directory (named with your Anki username). This is necessary to put generate
   audio files in the correct place.
 * Save Directory: path to output the generated cards.
-* Default Directory when Opening CSV: as the title suggests. Save you some time if you are working on a CSV vocabulary
-  list.
 * Things 3 Vocabulary List (EN/DE): Things 3 projects as data sources for English/German learning modes.
 * Voice Settings: choose the voice to generate pronunciation audio.
 

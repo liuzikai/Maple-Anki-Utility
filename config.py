@@ -40,7 +40,7 @@ def save_config_from_variables():
 
 
 def is_config_valid() -> bool:
-    global anki_user_dir, save_dir, csv_default_dir
+    global anki_user_dir, save_dir
     if anki_user_dir is None or not os.path.exists(anki_user_dir):
         return False
     if save_dir is None or not os.path.exists(save_dir):
@@ -84,7 +84,6 @@ class ConfigWindow(QtWidgets.QDialog):
 
         self.anki_user_dir_valid = False
         self.save_dir_valid = False
-        self.csv_default_dir_valid = False
 
         self.init_ui()
 
@@ -129,31 +128,23 @@ class ConfigWindow(QtWidgets.QDialog):
             lambda: self.select_directory('save_dir', "Select a Directory to Save",
                                           save_dir_edit.text()))
 
-        # CSV Default Directory row
-        csv_default_dir_edit, csv_default_dir_button = create_directory_row(
-            2, 'csv_default_dir', 'Default Directory when Opening CSV (Optional)')
-        csv_default_dir_edit.textChanged.connect(self.check_csv_default_dir)
-        csv_default_dir_button.clicked.connect(
-            lambda: self.select_directory('csv_default_dir', 'Select the Default Directory when Opening CSV',
-                                          csv_default_dir_edit.text()))
-
         # Things 3 Project (EN) row
         things3_list_en_label = QtWidgets.QLabel('Things 3 Vocabulary List (EN)')
         things3_list_en_edit = QtWidgets.QLineEdit()
-        layout.addWidget(things3_list_en_label, 3, 0)
-        layout.addWidget(things3_list_en_edit, 3, 1)
+        layout.addWidget(things3_list_en_label, 2, 0)
+        layout.addWidget(things3_list_en_edit, 2, 1)
         self.line_edits['things3_list_en'] = things3_list_en_edit
 
         # Thing 3 Project (DE) row
         things3_list_de_label = QtWidgets.QLabel('Things 3 Vocabulary List (DE)')
         things3_list_de_edit = QtWidgets.QLineEdit()
-        layout.addWidget(things3_list_de_label, 4, 0)
-        layout.addWidget(things3_list_de_edit, 4, 1)
+        layout.addWidget(things3_list_de_label, 3, 0)
+        layout.addWidget(things3_list_de_edit, 3, 1)
         self.line_edits['things3_list_de'] = things3_list_de_edit
 
         # Vertical spacer
         spacer = QtWidgets.QSpacerItem(0, 16, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-        layout.addItem(spacer, 6, 0, 1, 3)
+        layout.addItem(spacer, 5, 0, 1, 3)
 
         # Voice Setting GroupBox
         voice_setting_group = QtWidgets.QGroupBox("Voice Settings")
@@ -212,7 +203,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.connect_test_buttons()
 
         voice_setting_group.setLayout(voice_setting_layout)
-        layout.addWidget(voice_setting_group, 7, 0, 1, 3)
+        layout.addWidget(voice_setting_group, 6, 0, 1, 3)
 
         # Create Save and Cancel buttons
         self.save_button = QtWidgets.QPushButton('Save')
@@ -226,9 +217,9 @@ class ConfigWindow(QtWidgets.QDialog):
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.cancel_button)
 
-        layout.addLayout(button_layout, 8, 1, 1, 2)
+        layout.addLayout(button_layout, 7, 1, 1, 2)
 
-        self.load_defaults()
+        self.load_ui_from_variables()
 
     def populate_voice_comboboxes(self):
         p = subprocess.Popen(f'"{bundle_files.lame_filename}" --version', shell=True, text=True,
@@ -295,16 +286,14 @@ class ConfigWindow(QtWidgets.QDialog):
             subprocess.Popen(command, shell=True,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def load_defaults(self):
+    def load_ui_from_variables(self):
         self.line_edits['anki_user_dir'].setText(anki_user_dir)
         self.line_edits['save_dir'].setText(save_dir)
-        self.line_edits['csv_default_dir'].setText(csv_default_dir)
         self.line_edits['things3_list_en'].setText(things_vocab_list_en)
         self.line_edits['things3_list_de'].setText(things_vocab_list_de)
         # setText may not trigger textChanged if empty string
         self.check_anki_user_dir()
         self.check_save_dir()
-        self.check_csv_default_dir()
 
         voice_settings = [en_voice_1, en_voice_2, de_voice_1, de_voice_2]
         for i, voice_setting in enumerate(voice_settings):
@@ -321,12 +310,11 @@ class ConfigWindow(QtWidgets.QDialog):
             self.line_edits[option].setText(selected_directory)
 
     def save(self):
-        global anki_user_dir, save_dir, csv_default_dir, things_vocab_list_en, things_vocab_list_de
+        global anki_user_dir, save_dir, things_vocab_list_en, things_vocab_list_de
         global en_voice_1, en_voice_2, de_voice_1, de_voice_2
 
         anki_user_dir = self.line_edits['anki_user_dir'].text()
         save_dir = self.line_edits['save_dir'].text()
-        csv_default_dir = self.line_edits['csv_default_dir'].text()
         things_vocab_list_en = self.line_edits['things3_list_en'].text()
         things_vocab_list_de = self.line_edits['things3_list_de'].text()
 
@@ -349,7 +337,7 @@ class ConfigWindow(QtWidgets.QDialog):
         else:
             self.line_edits['anki_user_dir'].setStyleSheet("color: red;")
 
-        self.save_button.setEnabled(self.anki_user_dir_valid and self.save_dir_valid and self.csv_default_dir_valid)
+        self.save_button.setEnabled(self.anki_user_dir_valid and self.save_dir_valid)
 
     def check_save_dir(self):
         dir_path = self.line_edits['save_dir'].text()
@@ -360,18 +348,7 @@ class ConfigWindow(QtWidgets.QDialog):
         else:
             self.line_edits['save_dir'].setStyleSheet("color: red;")
 
-        self.save_button.setEnabled(self.anki_user_dir_valid and self.save_dir_valid and self.csv_default_dir_valid)
-
-    def check_csv_default_dir(self):
-        dir_path = self.line_edits['csv_default_dir'].text()
-        self.csv_default_dir_valid = (dir_path == "" or os.path.exists(dir_path))
-
-        if self.csv_default_dir_valid:
-            self.line_edits['csv_default_dir'].setStyleSheet("")
-        else:
-            self.line_edits['csv_default_dir'].setStyleSheet("color: red;")
-
-        self.save_button.setEnabled(self.anki_user_dir_valid and self.save_dir_valid and self.csv_default_dir_valid)
+        self.save_button.setEnabled(self.anki_user_dir_valid and self.save_dir_valid)
 
     def closeEvent(self, event):
         if self.initial_setup:
