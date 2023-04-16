@@ -21,7 +21,7 @@ jobs:
         brew install lame
    
     - run: pip install -r requirements.txt pyinstaller
-    - run: pyinstaller --windowed -noconsole --add-binary="$(where lame):." -n "Maple Vocab Utility" --icon resource/icon.icns maple_vocab_utility.py
+    - run: pyinstaller --windowed -noconsole --add-binary="$(which lame):." -n "Maple Vocab Utility" --icon resource/icon.icns maple_vocab_utility.py
     
     - uses: actions/upload-artifact@v2
       with:
