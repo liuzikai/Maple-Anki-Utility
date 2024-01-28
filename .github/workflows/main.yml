@@ -10,7 +10,7 @@ jobs:
         os: ['macos-latest']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: 'true'
 
@@ -24,7 +24,7 @@ jobs:
         brew install lame create-dmg
    
     - run: pip install -r requirements.txt pyinstaller
-    - run: pyinstaller --windowed -noconsole --add-binary="$(which lame):." -n "Maple Vocab Utility" --icon resource/icon.icns maple_vocab_utility.py --target-arch universal2
+    - run: pyinstaller --windowed -noconsole --add-binary="$(which lame):." -n "Maple Vocab Utility" --icon resource/icon.icns maple_vocab_utility.py
 
     - name: Create dmg
       run: |
@@ -32,6 +32,6 @@ jobs:
         ./create_dmg.sh
       shell: bash
     
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         path: 'Maple-Vocab-Utility-Installer.dmg'
