@@ -10,7 +10,7 @@ from enum import Enum
 
 
 class RecordStatus(Enum):
-    UNVIEWED = 0   # not viewed yet
+    UNVIEWED = 0  # not viewed yet
     TOPROCESS = 1  # already viewed at least one (has been pronounced)
     CONFIRMED = 2
     DISCARDED = 3
@@ -26,6 +26,7 @@ class Record:
     paraphrase: str = ""
     extension: str = ""
     example: str = ""
+    raw_example: str = ""
     source_enabled: bool = False  # need to preserve source even not enabled, do not combine with source
     source: str = '<div align="right" style="font-size:12px"></div>'
     hint: str = ""
@@ -38,13 +39,12 @@ class Record:
 
 
 class DataManager(QtCore.QObject):
-
     record_status_changed = QtCore.pyqtSignal(int, RecordStatus, RecordStatus)  # cid, old_status, new_status
     record_inserted = QtCore.pyqtSignal(int, bool)  # cid, batch_loading(True)/add_single(False)
     record_cleared = QtCore.pyqtSignal()
     record_count_changed = QtCore.pyqtSignal()
     batch_load_started = QtCore.pyqtSignal()
-    batch_load_finished = QtCore.pyqtSignal()
+    batch_load_finished = QtCore.pyqtSignal(bool)  # is_kindle_db
 
     def __init__(self, output_path: str, media_path: str):
 
@@ -113,7 +113,7 @@ class DataManager(QtCore.QObject):
             self._db = None
         self._db = KindleDB(db_file)
 
-        self._reload_from_db()
+        self._reload_from_db(is_kindle_db=True)
 
     def reload_csv_data(self, csv_file: str) -> None:
         """
@@ -146,7 +146,7 @@ class DataManager(QtCore.QObject):
 
         self._reload_from_db()
 
-    def _reload_from_db(self) -> None:
+    def _reload_from_db(self, is_kindle_db: bool = False) -> None:
 
         self.clear()  # will emit signals
 
@@ -163,6 +163,7 @@ class DataManager(QtCore.QObject):
                 subject=raw["subject"],
                 db_id=raw["word_id"],
                 example=raw["usage"].replace(raw["subject"], u"<b>%s</b>" % raw["subject"]),
+                raw_example=raw["usage"],
                 source_enabled=(raw["source"] != ""),
                 source=raw["source"]
             )
@@ -170,13 +171,14 @@ class DataManager(QtCore.QObject):
             self.record_inserted.emit(r.cid, True)
 
         self._counts[RecordStatus.UNVIEWED] = len(self._records)
-        self._counts[RecordStatus.TOPROCESS] = self._counts[RecordStatus.CONFIRMED] = self._counts[RecordStatus.DISCARDED] = 0
+        self._counts[RecordStatus.TOPROCESS] = self._counts[RecordStatus.CONFIRMED] = self._counts[
+            RecordStatus.DISCARDED] = 0
 
         self.record_count_changed.emit()  # need to be ahead of batch_load_finished to enable editor
 
-        self.batch_load_finished.emit()
+        self.batch_load_finished.emit(is_kindle_db)
 
-    def set_status(self, cid: int, status: RecordStatus) -> None:
+    def set_status(self, cid: int, status: RecordStatus, without_commit: bool = False) -> None:
         """Set record status."""
 
         r = self._records[cid]
@@ -184,9 +186,12 @@ class DataManager(QtCore.QObject):
 
         old_status = r.status
 
-        if old_status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED] and status in [RecordStatus.UNVIEWED, RecordStatus.TOPROCESS]:
+        if old_status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED] and status in [RecordStatus.UNVIEWED,
+                                                                                         RecordStatus.TOPROCESS]:
             if self._db is not None and r.db_id is not None:
-                self._db.set_word_mature(r.db_id, 0)  # retract db status
+                self._db.set_word_mature_without_commit(r.db_id, 0)  # retract db status
+                if not without_commit:
+                    self._db.commit_changes()
 
         if old_status == RecordStatus.CONFIRMED:  # regardless of new status
             if self._exporter is not None:
@@ -205,8 +210,9 @@ class DataManager(QtCore.QObject):
 
         if status in [RecordStatus.CONFIRMED, RecordStatus.DISCARDED]:
             if self._db is not None and r.db_id is not None:
-                self._db.set_word_mature(r.db_id, 100)
-                self._db.commit_changes()
+                self._db.set_word_mature_without_commit(r.db_id, 100)
+                if not without_commit:
+                    self._db.commit_changes()
 
         self.record_status_changed.emit(cid, old_status, status)
         self.record_count_changed.emit()
@@ -256,6 +262,7 @@ class DataManager(QtCore.QObject):
             cid=cid,
             subject=subject,
             example=example,
+            raw_example=example,
             source_enabled=source_enabled,
             source=source
         ))
@@ -268,3 +275,22 @@ class DataManager(QtCore.QObject):
     @staticmethod
     def pronounce(word: str, speaker: str) -> None:
         DataExporter.pronounce(word, speaker)
+
+    def transfer_all_unsaved_to_things(self, things_list: str) -> None:
+        things_db = ThingsDB(things_list)
+        reconstructed_records = []
+        for cid, r in enumerate(self._records):
+            if r.status in [RecordStatus.UNVIEWED, RecordStatus.TOPROCESS]:
+                reconstructed_records.append({
+                    "subject": r.subject,
+                    "usage": r.raw_example,
+                    "source": r.source if r.source_enabled else ""  # will include div of align right
+                })
+        things_db.add_words_back(reconstructed_records)
+
+        # Set DISCARDED only if add_words_back above goes through
+        for cid, r in enumerate(self._records):
+            if r.status in [RecordStatus.UNVIEWED, RecordStatus.TOPROCESS]:
+                self.set_status(cid, RecordStatus.DISCARDED, without_commit=True)
+        # Commit changes all at once
+        self._db.commit_changes()

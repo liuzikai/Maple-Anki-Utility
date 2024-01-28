@@ -76,6 +76,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.loadThings.clicked.connect(self.load_things_clicked)
         self.newEntry.clicked.connect(self.add_new_entry_clicked)
         self.clearList.clicked.connect(self.clear_list_clicked)
+        self.kindleToThings.setVisible(False)
+        self.kindleToThings.clicked.connect(self.kindle_to_things_clicked)
         self.checkR.stateChanged.connect(self.card_type_changed)
         self.checkS.stateChanged.connect(self.card_type_changed)
         self.checkD.stateChanged.connect(self.card_type_changed)
@@ -234,12 +236,13 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.discardBar.setValue(self.data.count(RecordStatus.DISCARDED))
         self.discardBar.setToolTip("%d discarded" % self.discardBar.value())
 
-    @QtCore.pyqtSlot()
-    def handle_record_batch_load_finished(self):
+    @QtCore.pyqtSlot(bool)
+    def handle_record_batch_load_finished(self, is_kindle_db: bool):
         if self.data.count() > 0:
             QtCore.QCoreApplication.processEvents()
             self.entryList.setCurrentRow(0)
             self.paraphrase.setFocus()
+        self.kindleToThings.setVisible(is_kindle_db)
 
     @QtCore.pyqtSlot()
     def handle_record_clear(self):
@@ -615,6 +618,11 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     @QtCore.pyqtSlot()
     def clear_list_clicked(self):
         self.data.clear()
+
+    @QtCore.pyqtSlot()
+    def kindle_to_things_clicked(self):
+        things_list = config.things_vocab_list_en if self.englishMode.isChecked() else config.things_vocab_list_de
+        self.data.transfer_all_unsaved_to_things(things_list)
 
     @QtCore.pyqtSlot()
     def card_type_changed(self):

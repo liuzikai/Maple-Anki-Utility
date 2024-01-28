@@ -56,13 +56,6 @@
           <string/>
          </property>
          <layout class="QGridLayout" name="gridLayout">
-          <item row="3" column="1">
-           <widget class="QPushButton" name="loadCSV">
-            <property name="text">
-             <string>CSV</string>
-            </property>
-           </widget>
-          </item>
           <item row="3" column="0">
            <widget class="QPushButton" name="loadKindle">
             <property name="text">
@@ -70,20 +63,10 @@
             </property>
            </widget>
           </item>
-          <item row="0" column="0">
-           <widget class="QRadioButton" name="englishMode">
+          <item row="7" column="0" colspan="2">
+           <widget class="QPushButton" name="kindleToThings">
             <property name="text">
-             <string>EN</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QRadioButton" name="deutschMode">
-            <property name="text">
-             <string>DE</string>
+             <string>Transfer All to Things</string>
             </property>
            </widget>
           </item>
@@ -94,10 +77,37 @@
             </property>
            </widget>
           </item>
+          <item row="0" column="1">
+           <widget class="QRadioButton" name="deutschMode">
+            <property name="text">
+             <string>DE</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QPushButton" name="loadCSV">
+            <property name="text">
+             <string>CSV</string>
+            </property>
+           </widget>
+          </item>
           <item row="5" column="1">
            <widget class="QPushButton" name="newEntry">
+            <property name="toolTip">
+             <string>Create a single entry</string>
+            </property>
             <property name="text">
              <string>New</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QRadioButton" name="englishMode">
+            <property name="text">
+             <string>EN</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -313,6 +323,9 @@ QProgressBar::chunk {
              <font>
               <pointsize>30</pointsize>
              </font>
+            </property>
+            <property name="toolTip">
+             <string>Press Enter to trigger search on Collins Directory and pronunciation</string>
             </property>
             <property name="plainText">
              <string>Subject</string>
@@ -538,7 +551,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
              </size>
             </property>
             <property name="toolTip">
-             <string>Right click to search image on Google Image</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Right click to search image on Google Image&lt;/p&gt;&lt;p&gt;Double click to clear&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="text">
              <string>Image</string>

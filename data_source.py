@@ -32,7 +32,7 @@ class DB(ABC):
         pass
 
     @abstractmethod
-    def set_word_mature(self, word_id: str, category: int) -> None:
+    def set_word_mature_without_commit(self, word_id: str, category: int) -> None:
         """
         Set an entry as new/learned. The change may be cached and not taking effect until calling commit_changes()
         Can throw RuntimeError.
@@ -105,17 +105,40 @@ class ThingsDB(DB):
                 continue
             p = entry.split("😅")
             assert len(p) == 2, "Invalid applescript output entry"
+            pp = p[1].split("\n[Source] ")
             records.append({
                 "word_id": p[0],  # using word as word_id
                 "subject": p[0],
-                "usage": p[1],
-                "source": "",
+                "usage": pp[0],
+                "source": pp[-1] if len(pp) >= 2 else "",
+                # no div of align right since they should be already there if transferred from Kindle
             })
             self.word_categories[p[0]] = 0
 
         return records
 
-    def set_word_mature(self, word_id: str, category: int) -> None:
+    def add_words_back(self, records: [dict]) -> None:
+        script = """
+            tell application "Things3"
+        """
+        for record in records:
+            note = record["usage"]
+            if record["source"] != "":
+                note += "\n[Source] " + record["source"]
+            script += """
+                make new to do with properties {name:"%s", notes:"%s"} at the end of project "%s"
+            """ % (record["subject"], note.replace('"', '\\"'), self.things_list)
+        script += """
+            end tell
+        """
+        p = subprocess.Popen(["osascript"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate(script.encode())
+        if p.returncode != 0:
+            raise RuntimeError(f"Failed to run applescript to add words.\n"
+                               f"Please make sure Things 3 is installed and the list is configured properly.\n\n"
+                               f"{err.decode('utf-8')}")
+
+    def set_word_mature_without_commit(self, word_id: str, category: int) -> None:
 
         if self.word_categories[word_id] == category:
             return
@@ -193,7 +216,7 @@ class CsvDB(DB):
 
         return records
 
-    def set_word_mature(self, word_id: str, category: int) -> None:
+    def set_word_mature_without_commit(self, word_id: str, category: int) -> None:
         self.csv_data[int(word_id)][4] = str(category)
 
     def commit_changes(self):
@@ -243,7 +266,7 @@ class KindleDB(DB):
 
         return records
 
-    def set_word_mature(self, word_id: str, category: int) -> None:
+    def set_word_mature_without_commit(self, word_id: str, category: int) -> None:
         self.conn.execute(
             """
             UPDATE words SET category = ? WHERE id = ?
