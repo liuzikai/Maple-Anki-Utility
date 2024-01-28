@@ -58,6 +58,12 @@
          <layout class="QGridLayout" name="gridLayout">
           <item row="3" column="0">
            <widget class="QPushButton" name="loadKindle">
+            <property name="minimumSize">
+             <size>
+              <width>75</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>Kindle</string>
             </property>
@@ -72,6 +78,12 @@
           </item>
           <item row="5" column="0">
            <widget class="QPushButton" name="loadThings">
+            <property name="minimumSize">
+             <size>
+              <width>75</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>Things</string>
             </property>
@@ -86,6 +98,12 @@
           </item>
           <item row="3" column="1">
            <widget class="QPushButton" name="loadCSV">
+            <property name="minimumSize">
+             <size>
+              <width>75</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>CSV</string>
             </property>
@@ -93,6 +111,12 @@
           </item>
           <item row="5" column="1">
            <widget class="QPushButton" name="newEntry">
+            <property name="minimumSize">
+             <size>
+              <width>75</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="toolTip">
              <string>Create a single entry</string>
             </property>

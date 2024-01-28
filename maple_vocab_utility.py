@@ -252,6 +252,7 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.entryList.clear()
         QtCore.QCoreApplication.processEvents()
         self.entryList.selectionModel().blockSignals(False)  # <-------- entryList signals unblocked --------
+        self.kindleToThings.setVisible(False)
 
     @QtCore.pyqtSlot(int, RecordStatus, RecordStatus)
     def handle_record_status_changed(self, cid: int, old_status: RecordStatus, new_status: RecordStatus):
