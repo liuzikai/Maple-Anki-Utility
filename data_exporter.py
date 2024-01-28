@@ -55,7 +55,7 @@ class DataExporter:
             assert self.media_proc.returncode == 0, "Fail to generate media"
 
         filename = DataExporter.new_random_filename("mp3")
-        say_command = " ".join(["say", "-v", speaker, "-r", "175", "-o", '"%s"' % self.temp_media_file, '"%s"' % word])
+        say_command = " ".join(["say", "-v", '"%s"' % speaker, "-r", "175", "-o", '"%s"' % self.temp_media_file, '"%s"' % word])
         lame_command = " ".join(
             [f'"{bundle_files.lame_filename}"', '-m', 'm', '"%s"' % self.temp_media_file, '"%s/%s"' % (self.media_path, filename)])
         self.media_proc = subprocess.Popen(say_command + " && " + lame_command,
