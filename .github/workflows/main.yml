@@ -32,6 +32,7 @@ jobs:
         ./create_dmg.sh
       shell: bash
     
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v3
       with:
-        path: 'Maple-Vocab-Utility-Installer.dmg'
+        name: maple-utility-${{ matrix.os }}-${{ matrix.version }}
+        path: Maple-Vocab-Utility-Installer.dmg
