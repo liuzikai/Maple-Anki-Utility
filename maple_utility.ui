@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1421</width>
-    <height>888</height>
+    <width>1467</width>
+    <height>903</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -42,12 +42,12 @@
      <number>0</number>
     </property>
     <item>
-     <widget class="QWidget" name="widget_2" native="true">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
+     <widget class="QWidget" name="controlArea" native="true">
+      <property name="maximumSize">
+       <size>
+        <width>220</width>
+        <height>16777215</height>
+       </size>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
@@ -150,12 +150,6 @@
          <property name="enabled">
           <bool>true</bool>
          </property>
-         <property name="maximumSize">
-          <size>
-           <width>180</width>
-           <height>16777215</height>
-          </size>
-         </property>
          <property name="font">
           <font>
            <pointsize>14</pointsize>
@@ -168,12 +162,6 @@
        </item>
        <item>
         <widget class="QGroupBox" name="groupBox">
-         <property name="maximumSize">
-          <size>
-           <width>180</width>
-           <height>16777215</height>
-          </size>
-         </property>
          <property name="title">
           <string>Progress</string>
          </property>
@@ -188,7 +176,7 @@
             </property>
             <property name="maximumSize">
              <size>
-              <width>130</width>
+              <width>16777215</width>
               <height>6</height>
              </size>
             </property>
@@ -305,7 +293,7 @@ QProgressBar::chunk {
      </widget>
     </item>
     <item>
-     <widget class="QWidget" name="editWidget" native="true">
+     <widget class="QWidget" name="editArea" native="true">
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QLabel" name="label">
@@ -799,13 +787,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
      </widget>
     </item>
     <item>
-     <widget class="QWidget" name="widget_5" native="true">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
+     <widget class="QWidget" name="webQueryArea" native="true">
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <widget class="QGroupBox" name="groupBox_3">
@@ -821,6 +803,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
          <layout class="QHBoxLayout" name="horizontalLayout_7">
           <item>
            <widget class="QCheckBox" name="autoQueryCheck">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="text">
              <string>Auto Query</string>
             </property>
@@ -850,6 +838,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
           </item>
           <item>
            <widget class="QPushButton" name="queryCollins">
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>Collins</string>
             </property>
@@ -857,6 +851,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
           </item>
           <item>
            <widget class="QPushButton" name="queryGoogle">
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>Google</string>
             </property>
@@ -864,6 +864,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
           </item>
           <item>
            <widget class="QPushButton" name="queryGoogleImage">
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>Image</string>
             </property>
@@ -871,6 +877,12 @@ li.checked::marker { content: &quot;\2612&quot;; }
           </item>
           <item>
            <widget class="QPushButton" name="queryGoogleTranslate">
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="text">
              <string>Translate</string>
             </property>
@@ -881,18 +893,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
        </item>
        <item>
         <widget class="QWidget" name="webViewFrame" native="true">
-         <property name="minimumSize">
-          <size>
-           <width>600</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>600</width>
-           <height>16777215</height>
-          </size>
-         </property>
          <layout class="QVBoxLayout" name="webViewVerticalLayout">
           <property name="leftMargin">
            <number>0</number>

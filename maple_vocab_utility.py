@@ -91,6 +91,14 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
                                   self.source, self.hint, self.checkR, self.checkS, self.checkD,
                                   self.queryCollins, self.queryGoogleImage, self.queryGoogleTranslate, self.queryGoogle]
 
+        # Wrap the things in a splitter programmatically
+        self.splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        self.splitter.addWidget(self.editArea)
+        self.splitter.addWidget(self.webQueryArea)
+        self.splitter.setStretchFactor(0, 5)
+        self.splitter.setStretchFactor(1, 2)
+        self.mainWidget.layout().addWidget(self.splitter)
+
         # Create the menu bar
         menu_bar = self.menuBar()
         settings_menu = menu_bar.addMenu("Settings")
@@ -115,8 +123,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
 
         # Setup WebQueryView
         self.wqv = WebQueryView(self.webViewFrame)
-        self.wqv.setMinimumSize(QtCore.QSize(600, 0))
-        self.wqv.setMaximumSize(QtCore.QSize(600, 16777215))
+        self.wqv.setMinimumSize(QtCore.QSize(0, 0))
+        self.wqv.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.webViewVerticalLayout.insertWidget(0, self.wqv)
         self.wqv.usage_updated.connect(self.handle_query_worker_usage)
         self.wqv.active_worker_progress.connect(self.handle_active_worker_progress)
