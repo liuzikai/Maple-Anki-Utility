@@ -8,5 +8,5 @@ create-dmg \
   --icon "Maple Vocab Utility.app" 150 150 \
   --hide-extension "Maple Vocab Utility.app" \
   --app-drop-link 450 150 \
-  "Maple-Vocab-Utility-Installer.dmg" \
+  "maple-utility-$1-macos-$2.dmg" \
   "dist/"

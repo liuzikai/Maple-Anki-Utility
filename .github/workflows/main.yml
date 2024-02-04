@@ -1,18 +1,24 @@
 on:
   push:
+    tags:
+      - '**'
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: [macos-12, macos-14]
     strategy:
-      fail-fast: false
       matrix:
-        os: ['macos-latest', 'macos-14']
+        os:
+        include:
+          - os: macos-12
+            label: intel
+          - os: macos-14
+            label: arm64
 
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: 'true'
+        submodules: true
 
     - uses: actions/setup-python@v5
       with:
@@ -29,10 +35,9 @@ jobs:
     - name: Create dmg
       run: |
         chmod +x ./create_dmg.sh
-        ./create_dmg.sh
+        ./create_dmg.sh ${{ github.ref_name }} ${{ matrix.label }}
       shell: bash
     
     - uses: actions/upload-artifact@v3
       with:
-        name: maple-utility-${{ matrix.os }}
-        path: Maple-Vocab-Utility-Installer.dmg
+        path: maple-utility-${{ github.ref_name }}-macos-${{ matrix.label }}.dmg
