@@ -349,6 +349,8 @@ class Ui_MapleUtility(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.queryStatusLabel.sizePolicy().hasHeightForWidth())
         self.queryStatusLabel.setSizePolicy(sizePolicy)
+        self.queryStatusLabel.setMinimumSize(QtCore.QSize(50, 0))
+        self.queryStatusLabel.setMaximumSize(QtCore.QSize(50, 16777215))
         self.queryStatusLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.queryStatusLabel.setObjectName("queryStatusLabel")
         self.horizontalLayout_7.addWidget(self.queryStatusLabel)
