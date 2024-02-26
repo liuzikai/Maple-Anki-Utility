@@ -5,5 +5,5 @@ html2text>=2020.1.16
 pyobjc-core>=10.1
 pyobjc-framework-Cocoa>=10.1
 pyobjc-framework-WebKit>=10.1
-PyQt6>=6.6.1
+PyQt6>=6.5.3
 pyquery>=2.0.0

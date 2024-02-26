@@ -66,6 +66,8 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
         self.smart_duplicate_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+N"), self)
         self.smart_duplicate_shortcut.activated.connect(self.smart_duplicate_entry)
         self.newEntry.setToolTip("Shortcut: Cmd + N\nSmart Duplicate: Cmd + Shift + N")
+        self.pron_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+P"), self)
+        self.pron_shortcut.activated.connect(self.pronounce)
         # There is no mouse signal for label. Override functions.
         self.imageLabel.mousePressEvent = self.image_clicked
         self.imageLabel.mouseDoubleClickEvent = self.image_double_clicked
@@ -656,10 +658,16 @@ class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     def query_google_clicked(self):
         self.wqv.request(self.cur_record().subject, QueryType.GOOGLE, self.cur_cid())
 
+    def pronounce(self):
+        if self.pronA.isChecked():
+            self.pronA.click()
+        if self.pronB.isChecked():
+            self.pronB.click()
+
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-    app.setApplicationVersion("1.1.3")
+    app.setApplicationVersion("1.1.5")
     # script_dir = os.path.dirname(os.path.realpath(__file__))
     # app.setWindowIcon(QtGui.QIcon(script_dir + os.path.sep + 'resource/1024.png'))
 
