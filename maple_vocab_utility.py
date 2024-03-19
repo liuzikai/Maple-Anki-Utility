@@ -19,11 +19,11 @@ KINDLE_DB_FILENAME = "/Volumes/Kindle/system/vocabulary/vocab.db"
 class MapleUtility(QtWidgets.QMainWindow, Ui_MapleUtility):
     """MapleVocabUtility MainWindow."""
 
-    BASIC_CARDS = "R"
+    BASIC_CARDS = "RD"
     MORE_CARDS_THRESHOLD_EN = 4
-    MORE_CARDS_EN = "RD"
+    MORE_CARDS_EN = "RSD"
     MORE_CARDS_THRESHOLD_DE = 5
-    MORE_CARDS_DE = "RS"
+    MORE_CARDS_DE = "RSD"
 
     def __init__(self, parent=None):
 
